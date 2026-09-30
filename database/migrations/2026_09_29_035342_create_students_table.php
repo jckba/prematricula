@@ -13,6 +13,26 @@ return new class extends Migration
     {
         Schema::create('students', function (Blueprint $table) {
             $table->id();
+
+            $table->foreignId('user_id')
+                ->unique()
+                ->constrained()
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+
+            $table->string('codigo_universitario', 30)
+                ->unique();
+
+            $table->string('nombres', 100);
+
+            $table->string('apellidos', 150);
+
+            $table->unsignedSmallInteger('creditos_maximos')
+                ->default(22);
+
+            $table->string('estado', 20)
+                ->default('ACTIVO');
+
             $table->timestamps();
         });
     }

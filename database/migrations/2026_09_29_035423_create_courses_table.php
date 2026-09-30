@@ -13,6 +13,13 @@ return new class extends Migration
     {
         Schema::create('courses', function (Blueprint $table) {
             $table->id();
+            $table->string('codigo', 30)
+                ->unique();
+            $table->string('nombre', 150);
+            $table->unsignedSmallInteger('creditos');
+            $table->unsignedSmallInteger('ciclo');
+            $table->string('estado', 20)
+                ->default('ACTIVO');
             $table->timestamps();
         });
     }
