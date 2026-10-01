@@ -18,7 +18,12 @@ class AcademicHistorySeeder extends Seeder
             '1452700722'
         )->firstOrFail();
 
-        $period = AcademicPeriod::where(
+        $period2026I = AcademicPeriod::where(
+            'codigo',
+            '2026-I'
+        )->firstOrFail();
+
+        $period2026II = AcademicPeriod::where(
             'codigo',
             '2026-II'
         )->firstOrFail();
@@ -36,7 +41,7 @@ class AcademicHistorySeeder extends Seeder
         AcademicHistory::create([
             'student_id' => $student->id,
             'course_id' => $programacion1->id,
-            'academic_period_id' => $period->id,
+            'academic_period_id' => $period2026I->id,
             'nota_final' => 15,
             'estado' => AcademicHistoryStatus::APROBADO,
         ]);
@@ -44,7 +49,7 @@ class AcademicHistorySeeder extends Seeder
         AcademicHistory::create([
             'student_id' => $student->id,
             'course_id' => $programacion2->id,
-            'academic_period_id' => $period->id,
+            'academic_period_id' => $period2026II->id,
             'nota_final' => null,
             'estado' => AcademicHistoryStatus::EN_CURSO,
         ]);

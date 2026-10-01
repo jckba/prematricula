@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['stundent_id', 'academic_period_id', 'estado', 'fecha_envio', 'fecha_revision', 'reviewed_by', 'comentarios_coordinador'])]
+#[Fillable(['student_id', 'academic_period_id', 'estado', 'fecha_envio', 'fecha_revision', 'reviewed_by', 'comentarios_coordinador'])]
 class PreEnrollmentRequest extends Model
 {
     use HasFactory;

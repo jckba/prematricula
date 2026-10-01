@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "laravel-boost": {
+      "command": "/usr/bin/php",
+      "args": [
+        "/home/jes0/Documentos/UNT/prematricula/artisan",
+        "boost:mcp"
+      ]
+    }
+  }
+}
