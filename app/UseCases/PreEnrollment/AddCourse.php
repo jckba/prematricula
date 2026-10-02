@@ -16,8 +16,7 @@ class AddCourse
     public function __construct(
         private readonly GetAvailableCourses $getAvailableCourses,
         private readonly PreEnrollmentPeriodValidator $periodValidator
-    ){
-    }
+    ) {}
 
     public function __invoke(
         PreEnrollmentRequest $request,
@@ -56,7 +55,7 @@ class AddCourse
         }
 
         if (
-            !$this->getAvailableCourses
+            ! $this->getAvailableCourses
                 ->isAvailable($request->student, $course)
         ) {
             throw new DomainException(
@@ -84,5 +83,4 @@ class AddCourse
             'preferencia_turno' => $preference,
         ]);
     }
-
 }

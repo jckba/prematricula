@@ -13,22 +13,20 @@ class RejectPreEnrollment
 {
     public function __construct(
         private readonly PreEnrollmentReviewValidator $reviewValidator
-    )
-    {
-    }
+    ) {}
 
     public function __invoke(
         PreEnrollmentRequest $request,
-        User                 $reviewer,
-        string               $comment
-    ): PreEnrollmentRequest
-    {
+        User $reviewer,
+        string $comment
+    ): PreEnrollmentRequest {
         $comment = trim($comment);
         if ($comment === '') {
             throw new DomainException(
                 'Debe indicar el motivo del rechazo.'
             );
         }
+
         return DB::transaction(function () use (
             $request,
             $reviewer,

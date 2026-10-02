@@ -1,9 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Coordinator\PreEnrollmentController as CoordinatorPreEnrollmentController;
 use App\Http\Controllers\Api\Student\PreEnrollmentController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\Coordinator\PreEnrollmentController as CoordinatorPreEnrollmentController;
 
 Route::prefix('v1')->group(function () {
     Route::post('/login', [

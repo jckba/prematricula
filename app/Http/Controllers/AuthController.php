@@ -16,19 +16,17 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function login(LoginRequest $request): RedirectResponse {
-        $credentials =  $request->validated();
+    public function login(LoginRequest $request): RedirectResponse
+    {
+        $credentials = $request->validated();
 
         $authenticated = Auth::attempt([
-            'correo_institucional' =>
-            $credentials['correo_institucional'],
-            'password' =>
-            $credentials['password'],
-            'estado' =>
-            RecordStatus::ACTIVO->value,
+            'correo_institucional' => $credentials['correo_institucional'],
+            'password' => $credentials['password'],
+            'estado' => RecordStatus::ACTIVO->value,
         ]);
 
-        if(! $authenticated) {
+        if (! $authenticated) {
             return back()
                 ->withErrors([
                     'correo_institucional' => 'Credenciales inválidas',

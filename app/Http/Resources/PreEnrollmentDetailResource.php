@@ -16,8 +16,7 @@ class PreEnrollmentDetailResource extends JsonResource
                 $this->whenLoaded('course')
             ),
 
-            'preferencia_turno' =>
-                $this->preferencia_turno->value,
+            'preferencia_turno' => $this->preferencia_turno->value,
         ];
     }
 }

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('password');
             $table->string('rol', 30);
             $table->string('estado', 20)
-            ->default('ACTIVO');
+                ->default('ACTIVO');
             $table->rememberToken();
             $table->timestamps();
         });

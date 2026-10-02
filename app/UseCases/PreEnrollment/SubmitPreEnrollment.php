@@ -11,10 +11,9 @@ use Illuminate\Support\Facades\DB;
 class SubmitPreEnrollment
 {
     public function __construct(
-      private readonly GetAvailableCourses $getAvailableCourses,
-      private readonly PreEnrollmentPeriodValidator $periodValidator
-    ){
-    }
+        private readonly GetAvailableCourses $getAvailableCourses,
+        private readonly PreEnrollmentPeriodValidator $periodValidator
+    ) {}
 
     public function __invoke(
         PreEnrollmentRequest $request
@@ -54,7 +53,7 @@ class SubmitPreEnrollment
 
             foreach ($request->details as $detail) {
                 if (
-                    !$this->getAvailableCourses->isAvailable(
+                    ! $this->getAvailableCourses->isAvailable(
                         $request->student,
                         $detail->course
                     )

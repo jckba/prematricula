@@ -16,6 +16,9 @@ use Tests\TestCase;
 class PreEnrollmentApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const API = '/api/v1';
+
     public function test_student_can_get_available_courses(): void
     {
         [$user, $student] = $this->createStudent();
@@ -33,7 +36,7 @@ class PreEnrollmentApiTest extends TestCase
         Sanctum::actingAs($user);
 
         $response = $this->getJson(
-            '/api/student/pre-enrollment/available-courses'
+            self::API.'/student/pre-enrollment/available-courses'
         );
 
         $response
@@ -51,7 +54,7 @@ class PreEnrollmentApiTest extends TestCase
     public function test_guest_cannot_access_student_pre_enrollment(): void
     {
         $response = $this->getJson(
-            '/api/student/pre-enrollment'
+            self::API.'/student/pre-enrollment'
         );
 
         $response->assertUnauthorized();
@@ -69,7 +72,7 @@ class PreEnrollmentApiTest extends TestCase
         Sanctum::actingAs($coordinator);
 
         $response = $this->getJson(
-            '/api/student/pre-enrollment'
+            self::API.'/student/pre-enrollment'
         );
 
         $response->assertForbidden();
@@ -107,6 +110,7 @@ class PreEnrollmentApiTest extends TestCase
             'estado' => AcademicPeriodStatus::PREMATRICULA,
         ]);
     }
+
     public function test_student_cannot_access_coordinator_routes(): void
     {
         $user = User::create([
@@ -119,7 +123,7 @@ class PreEnrollmentApiTest extends TestCase
         Sanctum::actingAs($user);
 
         $response = $this->getJson(
-            '/api/coordinator/pre-enrollments'
+            self::API.'/coordinator/pre-enrollments'
         );
 
         $response->assertForbidden();

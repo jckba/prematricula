@@ -2,26 +2,23 @@
 
 namespace App\UseCases\PreEnrollment;
 
-use App\Enums\AcademicPeriodStatus;
 use App\Enums\PreEnrollmentStatus;
 use App\Models\AcademicPeriod;
 use App\Models\PreEnrollmentRequest;
 use App\Models\Student;
 use App\Services\PreEnrollmentPeriodValidator;
-use DomainException;
 
 class GetOrCreateDraft
 {
     public function __construct(
         private readonly PreEnrollmentPeriodValidator $periodValidator
-    ){
+    ) {}
 
-    }
     public function __invoke(
         Student $student,
         AcademicPeriod $period
     ): PreEnrollmentRequest {
-        $this ->periodValidator->validate($period);
+        $this->periodValidator->validate($period);
 
         $request = PreEnrollmentRequest::query()
             ->where('student_id', $student->id)

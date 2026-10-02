@@ -23,11 +23,11 @@ class LoginRequest extends FormRequest
             'correo_institucional' => [
                 'required',
                 'email',
-                'max:255'
+                'max:255',
             ],
             'password' => [
                 'required',
-                'string'
+                'string',
             ],
         ];
     }

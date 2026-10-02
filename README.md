@@ -1,58 +1,129 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistema de Prematrícula Académica (Backend API)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API RESTful desarrollada en **Laravel 12 (PHP 8.4)** y **PostgreSQL** para la gestión integral del proceso de prematrícula universitaria.
 
-## About Laravel
+Permite a los estudiantes autenticarse, consultar los cursos habilitados según su historial académico y prerrequisitos, armar y editar su borrador de prematrícula con preferencias de turno, y enviar la solicitud. Posteriormente, los coordinadores académicos pueden revisar, aprobar o rechazar las solicitudes recibidas.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 📚 Documentación para Desarrolladores Frontend
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Toda la documentación detallada para la integración del cliente frontend se encuentra en la carpeta [`docs/`](./docs/README.md):
 
-## Learning Laravel
+- **[Índice y Guía General](./docs/README.md)**: Convenciones HTTP, cabeceras, formato estándar de respuestas y manejo de errores.
+- **[Módulo de Autenticación](./docs/auth.md)**: Login (`/api/v1/login`), consulta de usuario autenticado (`/api/v1/me`) y logout (`/api/v1/logout`).
+- **[Módulo de Estudiante](./docs/student.md)**: Cursos disponibles, borrador de prematrícula, selección de cursos, preferencias de turno, envío e historial.
+- **[Módulo de Coordinador](./docs/coordinator.md)**: Listado con filtros, detalle de solicitudes, aprobación y rechazo con comentarios.
+- **[Enums y Tipos TypeScript](./docs/enums-and-types.md)**: Enumeraciones del backend e interfaces TypeScript listas para usar.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## 🛠️ Stack Tecnológico
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+- **Lenguaje:** PHP 8.4
+- **Framework:** Laravel 12
+- **Base de Datos:** PostgreSQL
+- **Autenticación:** Laravel Sanctum (Bearer Token)
+- **Testing:** PHPUnit
+- **Formateo de Código:** Laravel Pint
 
-## Agentic Development
+---
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## 📋 Requisitos Previos
 
+- PHP >= 8.3 / 8.4 (con extensiones `pdo_pgsql`, `mbstring`, `openssl`, `bcmath`, `curl`)
+- Composer >= 2.x
+- PostgreSQL >= 14
+- Git
+
+---
+
+## 🚀 Instalación y Puesta en Marcha
+
+1. **Clonar el repositorio:**
+   ```bash
+   git clone <URL_REPOSITORIO>
+   cd prematricula
+   ```
+
+2. **Instalar dependencias de PHP:**
+   ```bash
+   composer install
+   ```
+
+3. **Configurar el entorno:**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+
+4. **Configurar la base de datos en `.env`:**
+   ```env
+   DB_CONNECTION=pgsql
+   DB_HOST=127.0.0.1
+   DB_PORT=5432
+   DB_DATABASE=prematricula
+   DB_USERNAME=tu_usuario_postgres
+   DB_PASSWORD=tu_password
+   ```
+
+5. **Ejecutar migraciones y seeders iniciales:**
+   ```bash
+   php artisan migrate --seed
+   ```
+
+6. **Iniciar el servidor de desarrollo:**
+   ```bash
+   php artisan serve
+   ```
+   La API estará disponible en `http://localhost:8000/api/v1`.
+
+---
+
+## 🧪 Pruebas Automatizadas
+
+Ejecutar la suite completa de pruebas:
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+php artisan test
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Ejecutar pruebas específicas de la API:
+```bash
+php artisan test tests/Feature/Api/Student/PreEnrollmentApiTest.php
+php artisan test tests/Feature/Api/Coordinator/PreEnrollmentApiTest.php
+```
 
-## Contributing
+Formateo y análisis de estilo con Pint:
+```bash
+vendor/bin/pint --format agent
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## 🗺️ Resumen de Rutas de la API (`/api/v1`)
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Autenticación
+| Método | Ruta | Rol / Middleware | Descripción |
+|---|---|---|---|
+| `POST` | `/api/v1/login` | Público | Autenticación con credenciales institucionales |
+| `GET` | `/api/v1/me` | `auth:sanctum` | Obtiene datos del usuario en sesión |
+| `POST` | `/api/v1/logout` | `auth:sanctum` | Invalida el token actual |
 
-## Security Vulnerabilities
+### Estudiante (`/api/v1/student`)
+| Método | Ruta | Middleware | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/student/pre-enrollment/available-courses` | `auth:sanctum`, `role:ESTUDIANTE` | Cursos disponibles y límite de créditos |
+| `GET` | `/api/v1/student/pre-enrollment` | `auth:sanctum`, `role:ESTUDIANTE` | Obtener / crear borrador de prematrícula |
+| `GET` | `/api/v1/student/pre-enrollments` | `auth:sanctum`, `role:ESTUDIANTE` | Historial de solicitudes del estudiante |
+| `POST` | `/api/v1/student/pre-enrollment/courses` | `auth:sanctum`, `role:ESTUDIANTE` | Agregar curso al borrador con turno |
+| `PATCH` | `/api/v1/student/pre-enrollment/courses/{detail}/preference` | `auth:sanctum`, `role:ESTUDIANTE` | Cambiar preferencia de turno |
+| `DELETE` | `/api/v1/student/pre-enrollment/courses/{detail}` | `auth:sanctum`, `role:ESTUDIANTE` | Quitar curso del borrador |
+| `POST` | `/api/v1/student/pre-enrollment/submit` | `auth:sanctum`, `role:ESTUDIANTE` | Enviar solicitud para revisión |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Coordinador (`/api/v1/coordinator`)
+| Método | Ruta | Middleware | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/coordinator/pre-enrollments` | `auth:sanctum`, `role:COORDINADOR` | Listado paginado con filtro por estado |
+| `GET` | `/api/v1/coordinator/pre-enrollments/{id}` | `auth:sanctum`, `role:COORDINADOR` | Detalle completo de una solicitud |
+| `POST` | `/api/v1/coordinator/pre-enrollments/{id}/approve` | `auth:sanctum`, `role:COORDINADOR` | Aprobar prematrícula enviada |
+| `POST` | `/api/v1/coordinator/pre-enrollments/{id}/reject` | `auth:sanctum`, `role:COORDINADOR` | Rechazar prematrícula con comentario |

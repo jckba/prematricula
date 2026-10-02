@@ -26,9 +26,7 @@ class UpdateSchedulePreferenceRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'preferencia_turno.required' =>
-                'Debe indicar una preferencia de turno.',
+            'preferencia_turno.required' => 'Debe indicar una preferencia de turno.',
         ];
     }
-
 }

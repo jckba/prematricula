@@ -190,5 +190,4 @@ class GetAvailableCoursesTest extends TestCase
             $courses->contains('id', $database->id)
         );
     }
-
 }

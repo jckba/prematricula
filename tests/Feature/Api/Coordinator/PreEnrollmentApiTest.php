@@ -13,6 +13,8 @@ class PreEnrollmentApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const API = '/api/v1';
+
     public function test_student_cannot_access_coordinator_routes(): void
     {
         $user = User::create([
@@ -25,7 +27,7 @@ class PreEnrollmentApiTest extends TestCase
         Sanctum::actingAs($user);
 
         $response = $this->getJson(
-            '/api/coordinator/pre-enrollments'
+            self::API.'/coordinator/pre-enrollments'
         );
 
         $response->assertForbidden();

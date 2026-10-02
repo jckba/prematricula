@@ -29,7 +29,7 @@ return new class extends Migration
 
             $table->unique([
                 'pre_enrollment_request_id',
-                'course_id'
+                'course_id',
             ]);
         });
     }

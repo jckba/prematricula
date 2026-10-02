@@ -12,9 +12,8 @@ class UpdateSchedulePreference
 {
     public function __construct(
         private readonly PreEnrollmentPeriodValidator $periodValidator
-    )
-    {
-    }
+    ) {}
+
     public function __invoke(
         PreEnrollmentDetail $detail,
         SchedulePreference $preference
@@ -41,6 +40,4 @@ class UpdateSchedulePreference
 
         return $detail->refresh();
     }
-
-
 }

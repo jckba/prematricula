@@ -34,5 +34,4 @@ class AcademicHistory extends Model
     {
         return $this->belongsTo(AcademicPeriod::class);
     }
-
 }

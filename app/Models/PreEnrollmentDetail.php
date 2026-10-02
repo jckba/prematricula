@@ -18,6 +18,7 @@ class PreEnrollmentDetail extends Model
             'preferencia_turno' => SchedulePreference::class,
         ];
     }
+
     public function preEnrollmentRequest()
     {
         return $this->belongsTo(PreEnrollmentRequest::class);

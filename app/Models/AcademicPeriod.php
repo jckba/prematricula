@@ -3,12 +3,9 @@
 namespace App\Models;
 
 use App\Enums\AcademicPeriodStatus;
-use Illuminate\Database\Eloquent\Attributes\DateFormat;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
 
 #[Fillable(['codigo', 'fecha_inicio', 'fecha_fin', 'fecha_inicio_prematricula', 'fecha_fin_prematricula', 'estado'])]
 class AcademicPeriod extends Model
@@ -35,5 +32,4 @@ class AcademicPeriod extends Model
     {
         return $this->hasMany(PreEnrollmentRequest::class);
     }
-
 }

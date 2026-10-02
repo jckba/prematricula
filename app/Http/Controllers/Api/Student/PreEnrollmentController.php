@@ -18,7 +18,6 @@ use App\UseCases\PreEnrollment\GetOrCreateDraft;
 use App\UseCases\PreEnrollment\RemoveCourse;
 use App\UseCases\PreEnrollment\SubmitPreEnrollment;
 use App\UseCases\PreEnrollment\UpdateSchedulePreference;
-use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -57,8 +56,7 @@ class PreEnrollmentController extends Controller
 
         if ($student === null) {
             return response()->json([
-                'message' =>
-                    'El usuario autenticado no tiene un estudiante asociado.',
+                'message' => 'El usuario autenticado no tiene un estudiante asociado.',
             ], 403);
         }
 
@@ -90,8 +88,7 @@ class PreEnrollmentController extends Controller
 
         if ($student === null) {
             return response()->json([
-                'message' =>
-                    'El usuario autenticado no tiene un estudiante asociado.',
+                'message' => 'El usuario autenticado no tiene un estudiante asociado.',
             ], 403);
         }
 
@@ -139,8 +136,7 @@ class PreEnrollmentController extends Controller
 
         if ($student === null) {
             return response()->json([
-                'message' =>
-                    'El usuario autenticado no tiene un estudiante asociado.',
+                'message' => 'El usuario autenticado no tiene un estudiante asociado.',
             ], 403);
         }
 
@@ -170,8 +166,7 @@ class PreEnrollmentController extends Controller
 
         if ($student === null) {
             return response()->json([
-                'message' =>
-                    'El usuario autenticado no tiene un estudiante asociado.',
+                'message' => 'El usuario autenticado no tiene un estudiante asociado.',
             ], 403);
         }
 
@@ -195,13 +190,11 @@ class PreEnrollmentController extends Controller
         );
 
         return response()->json([
-            'message' =>
-                'Preferencia actualizada correctamente.',
+            'message' => 'Preferencia actualizada correctamente.',
 
             'data' => [
                 'id' => $updated->id,
-                'preferencia_turno' =>
-                    $updated->preferencia_turno->value,
+                'preferencia_turno' => $updated->preferencia_turno->value,
             ],
         ]);
     }
@@ -215,8 +208,7 @@ class PreEnrollmentController extends Controller
 
         if ($student === null) {
             return response()->json([
-                'message' =>
-                    'El usuario autenticado no tiene un estudiante asociado.',
+                'message' => 'El usuario autenticado no tiene un estudiante asociado.',
             ], 403);
         }
 
@@ -232,8 +224,7 @@ class PreEnrollmentController extends Controller
 
         if ($preEnrollment === null) {
             return response()->json([
-                'message' =>
-                    'No existe una prematrícula para enviar.',
+                'message' => 'No existe una prematrícula para enviar.',
             ], 404);
         }
 
@@ -272,5 +263,4 @@ class PreEnrollmentController extends Controller
             $requests
         );
     }
-
 }

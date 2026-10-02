@@ -2,13 +2,11 @@
 
 namespace Tests\Feature\UseCases\PreEnrollment;
 
-use App\Enums\AcademicHistoryStatus;
 use App\Enums\AcademicPeriodStatus;
 use App\Enums\PreEnrollmentStatus;
 use App\Enums\RecordStatus;
 use App\Enums\SchedulePreference;
 use App\Enums\UserRole;
-use App\Models\AcademicHistory;
 use App\Models\AcademicPeriod;
 use App\Models\Course;
 use App\Models\PreEnrollmentRequest;

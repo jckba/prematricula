@@ -48,8 +48,7 @@ class AuthController extends Controller
 
                 'user' => [
                     'id' => $user->id,
-                    'correo_institucional' =>
-                        $user->correo_institucional,
+                    'correo_institucional' => $user->correo_institucional,
                     'rol' => $user->rol->value,
                 ],
             ],
@@ -63,8 +62,7 @@ class AuthController extends Controller
         return response()->json([
             'data' => [
                 'id' => $user->id,
-                'correo_institucional' =>
-                    $user->correo_institucional,
+                'correo_institucional' => $user->correo_institucional,
                 'rol' => $user->rol->value,
                 'estado' => $user->estado->value,
             ],

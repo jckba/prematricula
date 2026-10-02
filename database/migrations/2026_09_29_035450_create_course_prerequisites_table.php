@@ -24,7 +24,7 @@ return new class extends Migration
 
             $table->primary([
                 'course_id',
-                'prerequisite_id'
+                'prerequisite_id',
             ]);
         });
     }

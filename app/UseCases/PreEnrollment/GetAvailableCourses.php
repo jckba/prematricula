@@ -8,7 +8,6 @@ use App\Models\Course;
 use App\Models\Student;
 use Illuminate\Support\Collection;
 
-
 class GetAvailableCourses
 {
     public function __invoke(Student $student): Collection
@@ -16,8 +15,7 @@ class GetAvailableCourses
         $histories = $student->academicHistories()->get();
 
         $excludedCourseIds = $histories
-            ->filter(fn ($history) =>
-            in_array(
+            ->filter(fn ($history) => in_array(
                 $history->estado,
                 [
                     AcademicHistoryStatus::APROBADO,
@@ -47,10 +45,9 @@ class GetAvailableCourses
     }
 
     private function meetsPrerequisites(
-        Course     $course,
+        Course $course,
         Collection $histories
-    ): bool
-    {
+    ): bool {
         if ($course->prerequisites->isEmpty()) {
             return true;
         }
@@ -60,9 +57,9 @@ class GetAvailableCourses
                 return $histories->contains(
                     function ($history) use ($prerequisite) {
                         return $history->course_id === $prerequisite->id && in_array($history->estado, [
-                                AcademicHistoryStatus::APROBADO,
-                                ACademicHistoryStatus::EN_CURSO,
-                            ], true);
+                            AcademicHistoryStatus::APROBADO,
+                            AcademicHistoryStatus::EN_CURSO,
+                        ], true);
                     }
                 );
             }
@@ -77,5 +74,4 @@ class GetAvailableCourses
         return $this->__invoke($student)
             ->contains('id', $course->id);
     }
-
 }

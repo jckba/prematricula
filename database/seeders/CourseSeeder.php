@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-
 use App\Enums\RecordStatus;
 use App\Models\Course;
 use Illuminate\Database\Seeder;

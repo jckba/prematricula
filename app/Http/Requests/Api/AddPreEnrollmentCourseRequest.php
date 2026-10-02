@@ -32,10 +32,8 @@ class AddPreEnrollmentCourseRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'course_id.required' =>
-                'Debe indicar el curso.',
-            'course_id.exists' =>
-                'El curso seleccionado no existe.',
+            'course_id.required' => 'Debe indicar el curso.',
+            'course_id.exists' => 'El curso seleccionado no existe.',
         ];
     }
 }

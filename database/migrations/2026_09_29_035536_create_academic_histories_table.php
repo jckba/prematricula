@@ -35,7 +35,7 @@ return new class extends Migration
             $table->unique([
                 'student_id',
                 'course_id',
-                'academic_period_id'
+                'academic_period_id',
             ]);
         });
     }

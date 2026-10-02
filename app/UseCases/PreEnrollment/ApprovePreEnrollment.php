@@ -12,15 +12,12 @@ class ApprovePreEnrollment
 {
     public function __construct(
         private readonly PreEnrollmentReviewValidator $reviewValidator
-    )
-    {
-    }
+    ) {}
 
     public function __invoke(
         PreEnrollmentRequest $request,
-        User                 $reviewer
-    ): PreEnrollmentRequest
-    {
+        User $reviewer
+    ): PreEnrollmentRequest {
         return DB::transaction(function () use ($request, $reviewer) {
 
             $lockedRequest = PreEnrollmentRequest::query()
