@@ -21,6 +21,7 @@ use App\UseCases\PreEnrollment\UpdateSchedulePreference;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class PreEnrollmentController extends Controller
 {
@@ -30,13 +31,6 @@ class PreEnrollmentController extends Controller
         CurrentPreEnrollmentPeriod $currentPeriod
     ): JsonResponse {
         $student = $request->user()->student;
-
-        if ($student === null) {
-            return response()->json([
-                'message' =>
-                    'El usuario autenticado no tiene un estudiante asociado.',
-            ], 403);
-        }
 
         $period = $currentPeriod->get();
 
@@ -48,12 +42,8 @@ class PreEnrollmentController extends Controller
                     'id' => $period->id,
                     'codigo' => $period->codigo,
                 ],
-
-                'creditos_maximos' =>
-                    $student->creditos_maximos,
-
-                'cursos' =>
-                    CourseResource::collection($courses),
+                'creditos_maximos' => $student->creditos_maximos,
+                'cursos' => CourseResource::collection($courses),
             ],
         ]);
     }
@@ -261,4 +251,26 @@ class PreEnrollmentController extends Controller
             $preEnrollment
         );
     }
+
+    public function history(
+        Request $request
+    ): AnonymousResourceCollection {
+        $student = $request->user()->student;
+
+        $requests = PreEnrollmentRequest::query()
+            ->where('student_id', $student->id)
+            ->with([
+                'student',
+                'academicPeriod',
+                'details.course',
+                'reviewer',
+            ])
+            ->orderByDesc('created_at')
+            ->paginate(10);
+
+        return PreEnrollmentResource::collection(
+            $requests
+        );
+    }
+
 }

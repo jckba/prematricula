@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Middleware\RequireStudentProfile;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -19,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'student.profile' => RequireStudentProfile::class,
         ]);
 
     })
@@ -68,5 +71,22 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
         );
+
+        $exceptions->render(
+            function (
+                ValidationException $exception,
+                Request $request
+            ) {
+                if ($request->is('api/*')) {
+                    return response()->json([
+                        'message' => 'Los datos enviados no son válidos.',
+                        'errors' => $exception->errors(),
+                    ], 422);
+                }
+
+                return null;
+            }
+        );
+
     })
     ->create();

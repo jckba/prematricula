@@ -10,7 +10,7 @@ class CurrentPreEnrollmentPeriod
 {
     public function get(): AcademicPeriod
     {
-        $period = AcademicPeriod::query()
+        $periods = AcademicPeriod::query()
             ->where(
                 'estado',
                 AcademicPeriodStatus::PREMATRICULA
@@ -25,12 +25,20 @@ class CurrentPreEnrollmentPeriod
                 '>=',
                 now()
             )
-            ->orderBy('fecha_inicio')
-            ->first();
+            ->get();
 
-        if ($period === null) {
-            throw new DomainException('No se encontró un periodo de prematricula habilitado');
+        if ($periods->isEmpty()) {
+            throw new DomainException(
+                'No existe un periodo de prematrícula habilitado.'
+            );
         }
-        return $period;
+
+        if ($periods->count() > 1) {
+            throw new DomainException(
+                'Existe más de un periodo de prematrícula habilitado.'
+            );
+        }
+
+        return $periods->first();
     }
 }
