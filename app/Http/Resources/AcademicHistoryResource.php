@@ -2,9 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\AcademicHistory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/** @mixin AcademicHistory */
 class AcademicHistoryResource extends JsonResource
 {
     public function toArray(Request $request): array

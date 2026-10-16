@@ -10,50 +10,54 @@ class CourseSeeder extends Seeder
 {
     public function run(): void
     {
-        $programacion1 = Course::create([
-            'codigo' => 'INF101',
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
+        $programacion1 = Course::firstOrCreate(['codigo' => 'INF101'], [
             'nombre' => 'Programación I',
             'creditos' => 4,
             'ciclo' => 1,
             'estado' => RecordStatus::ACTIVO,
+            'horas_teoria' => '2.00', 'horas_practica' => '2.00', 'horas_laboratorio' => '0.00',
         ]);
 
-        $matematica1 = Course::create([
-            'codigo' => 'MAT101',
+        $matematica1 = Course::firstOrCreate(['codigo' => 'MAT101'], [
             'nombre' => 'Matemática I',
             'creditos' => 4,
             'ciclo' => 1,
             'estado' => RecordStatus::ACTIVO,
+            'horas_teoria' => '2.00', 'horas_practica' => '2.00', 'horas_laboratorio' => '0.00',
         ]);
 
-        $programacion2 = Course::create([
-            'codigo' => 'INF201',
+        $programacion2 = Course::firstOrCreate(['codigo' => 'INF201'], [
             'nombre' => 'Programación II',
             'creditos' => 5,
             'ciclo' => 2,
             'estado' => RecordStatus::ACTIVO,
+            'horas_teoria' => '2.00', 'horas_practica' => '2.00', 'horas_laboratorio' => '0.00',
         ]);
 
-        $baseDatos = Course::create([
-            'codigo' => 'INF301',
+        $baseDatos = Course::firstOrCreate(['codigo' => 'INF301'], [
             'nombre' => 'Base de Datos',
             'creditos' => 4,
             'ciclo' => 3,
             'estado' => RecordStatus::ACTIVO,
+            'horas_teoria' => '2.00', 'horas_practica' => '2.00', 'horas_laboratorio' => '0.00',
         ]);
 
-        $algoritmos = Course::create([
-            'codigo' => 'INF302',
+        $algoritmos = Course::firstOrCreate(['codigo' => 'INF302'], [
             'nombre' => 'Algoritmos y Estructuras de Datos',
             'creditos' => 5,
             'ciclo' => 3,
             'estado' => RecordStatus::ACTIVO,
+            'horas_teoria' => '2.00', 'horas_practica' => '2.00', 'horas_laboratorio' => '0.00',
         ]);
 
-        $programacion2->prerequisites()->attach($programacion1->id);
+        $programacion2->prerequisites()->syncWithoutDetaching([$programacion1->id]);
 
-        $baseDatos->prerequisites()->attach($programacion2->id);
+        $baseDatos->prerequisites()->syncWithoutDetaching([$programacion2->id]);
 
-        $algoritmos->prerequisites()->attach($programacion2->id);
+        $algoritmos->prerequisites()->syncWithoutDetaching([$programacion2->id]);
     }
 }

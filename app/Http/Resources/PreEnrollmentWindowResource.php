@@ -2,9 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\PreEnrollmentWindow;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/** @mixin PreEnrollmentWindow */
 class PreEnrollmentWindowResource extends JsonResource
 {
     public function toArray(Request $request): array

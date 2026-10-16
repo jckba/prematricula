@@ -1,15 +1,15 @@
 {
   "info": {
-    "name": "Prematrícula — API v1: registro, revisiones y constancias",
+    "name": "Prematrícula — API v1: consulta académica, demanda y carga docente",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Backend Laravel/Sanctum. Sin credenciales ni tokens incluidos. Configura base_url (incluye /api/v1), identifier y password. Ejecuta Login como coordinador para modificar/importar. En Validar y Confirmar selecciona exactamente el mismo archivo. Consulta docs/curriculum.md para límites, errores y política de protección histórica. Ambos cargos coordinadores tienen los mismos permisos. Períodos, ventanas e historial: docs/academic-process.md. Fechas de ventana locales en zona institucional; reapertura siempre global. Las notas no determinan aprobación por umbral. Flujo definitivo: BORRADOR -> ENVIADA sin aprobación individual. Ver docs/student.md. La corrección mantiene la revisión vigente y crea un borrador; el reenvío exitoso emite otra constancia."
+    "description": "API REST v1. Configurar base_url incluyendo /api/v1, identificadores por rol y password. Tokens de alumno, director y secretaria separados y vacios. No hay cuentas docentes. Ver docs/FRONTEND_HANDOFF.md y docs/API.md. Datos de demostracion solo local/testing."
   },
   "auth": {
     "type": "bearer",
     "bearer": [
       {
         "key": "token",
-        "value": "{{token}}",
+        "value": "{{student_token}}",
         "type": "string"
       }
     ]
@@ -51,7 +51,7 @@
       "type": "string"
     },
     {
-      "key": "period_id",
+      "key": "academic_period_id",
       "value": "1",
       "type": "string"
     },
@@ -84,12 +84,188 @@
       "key": "revision_id",
       "value": "1",
       "type": "string"
+    },
+    {
+      "key": "student_code",
+      "value": "0014527007",
+      "type": "string"
+    },
+    {
+      "key": "teacher_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "teaching_assignment_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "student_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "director_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "secretary_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "student_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "student_identifier",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "director_identifier",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "secretary_identifier",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
     {
       "name": "Autenticación",
       "item": [
+        {
+          "name": "Login student",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{student_identifier}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Login correcto\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"student_token\", pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login director",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{director_identifier}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Login correcto\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"director_token\", pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login secretary",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{secretary_identifier}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Login correcto\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"secretary_token\", pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
         {
           "name": "Login",
           "request": {
@@ -175,6 +351,30 @@
               }
             }
           ]
+        },
+        {
+          "name": "Comprobar acceso de secretaria",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{secretary_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/coordinator/teachers",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "response": []
         }
       ]
     },
@@ -377,7 +577,17 @@
           },
           "response": []
         }
-      ]
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{director_token}}",
+            "type": "string"
+          }
+        ]
+      }
     },
     {
       "name": "Períodos y ventanas globales",
@@ -406,7 +616,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/academic-periods/{{period_id}}"
+            "url": "{{base_url}}/academic-periods/{{academic_period_id}}"
           },
           "response": []
         },
@@ -451,7 +661,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}",
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"estado\": \"PREMATRICULA\"\n}",
@@ -474,7 +684,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}"
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}"
           },
           "response": []
         },
@@ -488,7 +698,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/academic-periods/{{period_id}}/windows"
+            "url": "{{base_url}}/academic-periods/{{academic_period_id}}/windows"
           },
           "response": []
         },
@@ -506,7 +716,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}/windows",
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/windows",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tipo\": \"ORDINARIA\",\n  \"fecha_inicio\": \"2026-10-16 09:00:00\",\n  \"fecha_fin\": \"2026-10-18 18:00:00\",\n  \"motivo\": \"Apertura ordinaria\"\n}",
@@ -533,7 +743,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}/windows",
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/windows",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tipo\": \"EXTRAORDINARIA\",\n  \"fecha_inicio\": \"2026-10-20 09:00:00\",\n  \"fecha_fin\": \"2026-10-22 18:00:00\",\n  \"motivo\": \"Resultados oficiales publicados\"\n}",
@@ -556,11 +766,21 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}/demand"
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/demand"
           },
           "response": []
         }
-      ]
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{director_token}}",
+            "type": "string"
+          }
+        ]
+      }
     },
     {
       "name": "Historial académico XLSX y auditoría",
@@ -728,7 +948,17 @@
           },
           "response": []
         }
-      ]
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{director_token}}",
+            "type": "string"
+          }
+        ]
+      }
     },
     {
       "name": "Prematrícula estudiantil — flujo definitivo",
@@ -1053,7 +1283,513 @@
           },
           "response": []
         }
-      ]
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{director_token}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Consulta académica y estadísticas de demanda",
+      "description": "Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. No incluye correos ni cuentas. Ceros iniciales en códigos se conservan. Sin padrón por período, no enviados y población se informan como null.",
+      "item": [
+        {
+          "name": "Buscar estudiante por código exacto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/students?codigo_universitario={{student_code}}",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar por nombre o código parcial",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/students?q=ana&estado=ACTIVO&sort=apellidos&direction=asc&per_page=20&page=1",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar historial y prematrícula por código",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/students/{{student_code}}/academic?academic_period_id={{academic_period_id}}&per_page=20&page=1",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Demanda por curso",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/demand?sort=registrada&direction=desc&per_page=20&page=1",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Demanda filtrada por curso y ciclo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/demand?course_id={{course_id}}&ciclo=2",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Resumen de alumnos y ciclos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/summary",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Exportar demanda CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/demand/export?sort=codigo&direction=asc",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar interesados en un curso",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/demand/courses/{{course_id}}/students?per_page=20&page=1",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Interesados con prerrequisitos provisionales",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/demand/courses/{{course_id}}/students?estado_validacion=PENDIENTE_RESULTADOS&preferencia_turno=TARDE",
+            "description": "Solo COORDINADOR activo. Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva. Consulta OpenAPI/API.md para reglas de conteo y filtros."
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{director_token}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Gestión de carga académica docente",
+      "description": "Una unidad docente por curso/período, con asignaciones parciales y auditadas. No genera grupos a partir de la demanda. No representa turnos, horarios ni conflictos de tiempo.",
+      "item": [
+        {
+          "name": "Registrar docente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teachers",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_institucional\": \"DOC-DEMO-API\",\n  \"nombres\": \"Ana\",\n  \"apellidos\": \"Pérez\",\n  \"correo_institucional\": null,\n  \"max_horas_semanales\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) { pm.collectionVariables.set(\"teacher_id\", pm.response.json().data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar docentes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teachers?q=ana&estado=ACTIVO&per_page=20&page=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar docente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teachers/{{teacher_id}}",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar límite docente",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teachers/{{teacher_id}}",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"max_horas_semanales\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Asignar horas de curso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teaching-assignments",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academic_period_id\": {{academic_period_id}},\n  \"teacher_id\": {{teacher_id}},\n  \"course_id\": {{course_id}},\n  \"horas_teoria_asignadas\": 1,\n  \"horas_practica_asignadas\": 0,\n  \"horas_laboratorio_asignadas\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) { pm.collectionVariables.set(\"teaching_assignment_id\", pm.response.json().data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar asignaciones del período",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teaching-assignments?academic_period_id={{academic_period_id}}&per_page=20&page=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar asignación",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teaching-assignments/{{teaching_assignment_id}}",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar horas asignadas",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teaching-assignments/{{teaching_assignment_id}}",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"horas_teoria_asignadas\": 0.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar auditoría",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teaching-assignments/{{teaching_assignment_id}}/history?per_page=20&page=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Resumen de carga del período",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/teaching-load",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Carga por docente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/teaching-load/teachers?per_page=20&page=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Docentes con exceso de carga",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/teaching-load/teachers?excede_limite=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Cursos y carga de un docente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/teaching-load/teachers/{{teacher_id}}?per_page=20&page=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Cobertura, pendientes y demanda estimada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/teaching-load/courses?per_page=20&page=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Docentes y pendientes de un curso",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{academic_period_id}}/teaching-load/courses/{{course_id}}?per_page=20&page=1",
+            "description": "Solo coordinador activo. Ver OpenAPI/API.md. No hay docentes con cuentas, secciones, horarios ni matrícula definitiva."
+          },
+          "response": []
+        },
+        {
+          "name": "Baja lógica de asignación",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teaching-assignments/{{teaching_assignment_id}}",
+            "description": "Solo períodos abiertos. Conserva fila y auditoría; libera horas. CERRADO devuelve 409."
+          },
+          "response": []
+        },
+        {
+          "name": "Desactivar docente",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/teachers/{{teacher_id}}",
+            "description": "Desactiva conservando ficha e historia. PATCH estado=INACTIVO tiene el mismo efecto."
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{director_token}}",
+            "type": "string"
+          }
+        ]
+      }
     }
   ]
 }

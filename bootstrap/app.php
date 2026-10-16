@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -32,7 +33,14 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 
-        $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->expectsJson());
+        $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api', 'api/*') || $request->expectsJson());
+        $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
+            if ($request->is('api', 'api/*') && $response->getStatusCode() >= 500) {
+                return response()->json(['message' => 'No se pudo completar la operación.'], $response->getStatusCode());
+            }
+
+            return $response;
+        });
         $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'token', 'access_token']);
 
         $exceptions->report(function (QueryException $exception): bool {

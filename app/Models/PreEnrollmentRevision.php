@@ -26,11 +26,13 @@ class PreEnrollmentRevision extends Model
         static::deleting(fn () => throw new LogicException('Las revisiones enviadas son inmutables.'));
     }
 
+    /** @return BelongsTo<PreEnrollmentRequest, $this> */
     public function preEnrollmentRequest(): BelongsTo
     {
         return $this->belongsTo(PreEnrollmentRequest::class);
     }
 
+    /** @return BelongsToMany<Course, $this> */
     public function courses(): BelongsToMany
     {
         return $this->belongsToMany(Course::class, 'pre_enrollment_revision_courses', 'revision_id', 'course_id');

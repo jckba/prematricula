@@ -42,18 +42,20 @@ class AcademicHistorySeeder extends Seeder
             'INF201'
         )->firstOrFail();
 
-        AcademicHistory::create([
+        AcademicHistory::firstOrCreate([
             'student_id' => $student->id,
             'course_id' => $programacion1->id,
             'academic_period_id' => $period2026I->id,
+        ], [
             'nota_final' => 15,
             'estado' => AcademicHistoryStatus::APROBADO,
         ]);
 
-        AcademicHistory::create([
+        AcademicHistory::firstOrCreate([
             'student_id' => $student->id,
             'course_id' => $programacion2->id,
             'academic_period_id' => $period2026II->id,
+        ], [
             'nota_final' => null,
             'estado' => AcademicHistoryStatus::EN_CURSO,
         ]);

@@ -1,5 +1,7 @@
 # Documentación de API Backend para Frontend
 
+La referencia vigente para la entrega final es [FRONTEND_HANDOFF.md](FRONTEND_HANDOFF.md), junto con [API.md](API.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATABASE.md](DATABASE.md), [BUSINESS_RULES.md](BUSINESS_RULES.md), [IMPORT_FORMATS.md](IMPORT_FORMATS.md) y [DEVELOPMENT.md](DEVELOPMENT.md). Los contratos verificables están en [OpenAPI](../OpenAPI/openapi.yaml) y [Postman](../OpenAPI/Prematricula.postman_collection.json).
+
 Esta documentación está diseñada específicamente para que los desarrolladores frontend puedan integrar de manera rápida, confiable y eficiente todas las funcionalidades del **Sistema de Prematrícula Académica**.
 
 ---

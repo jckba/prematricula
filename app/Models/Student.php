@@ -25,16 +25,19 @@ class Student extends Model
         ];
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return HasMany<AcademicHistory, $this> */
     public function academicHistories(): HasMany
     {
         return $this->hasMany(AcademicHistory::class);
     }
 
+    /** @return HasMany<PreEnrollmentRequest, $this> */
     public function preEnrollmentRequests(): HasMany
     {
         return $this->hasMany(PreEnrollmentRequest::class);

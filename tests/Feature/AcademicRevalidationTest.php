@@ -11,10 +11,12 @@ use App\Models\PreEnrollmentRequest;
 use App\Models\PreEnrollmentWindow;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\RevalidatePreEnrollments;
 use App\UseCases\PreEnrollment\AddCourse;
 use App\UseCases\PreEnrollment\GetAvailableCourses;
 use App\UseCases\PreEnrollment\GetOrCreateDraft;
 use App\UseCases\PreEnrollment\SubmitPreEnrollment;
+use Database\Factories\PreEnrollmentRevisionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +27,35 @@ use Tests\TestCase;
 class AcademicRevalidationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_course_deactivation_revalidates_open_requests_without_rewriting_their_revisions(): void
+    {
+        $this->travelTo('2026-10-16 15:00:00 UTC');
+        $course = Course::factory()->create();
+        $open = AcademicPeriod::factory()->create();
+        $closed = AcademicPeriod::factory()->closed()->create();
+        $requests = [];
+        foreach ([$open, $closed] as $period) {
+            $request = PreEnrollmentRequest::factory()->for($period)->create(['estado' => 'ENVIADA']);
+            $snapshot = PreEnrollmentRevisionFactory::new()->raw()['snapshot'];
+            $snapshot['detalles'] = [['course_id' => $course->id, 'codigo' => $course->codigo,
+                'nombre' => $course->nombre, 'creditos' => $course->creditos, 'preferencia_turno' => 'MANANA']];
+            $revision = PreEnrollmentRevisionFactory::new()->for($request)->create(['snapshot' => $snapshot]);
+            $revision->courses()->attach($course);
+            $request->update(['current_revision_id' => $revision->id]);
+            app(RevalidatePreEnrollments::class)->evaluate($request);
+            $requests[] = $request;
+        }
+        $actor = User::factory()->coordinator()->create();
+        $this->withToken($actor->createToken('test')->plainTextToken);
+
+        $this->patchJson('/api/v1/coordinator/courses/'.$course->id, ['estado' => 'INACTIVO'])->assertOk();
+
+        $this->assertSame(AcademicValidationStatus::REQUIERE_AJUSTE, $requests[0]->fresh()->academicValidation->estado);
+        $this->assertSame(AcademicValidationStatus::VALIDA, $requests[1]->fresh()->academicValidation->estado);
+        $this->assertSame($requests[0]->current_revision_id, $requests[0]->fresh()->current_revision_id);
+        $this->assertDatabaseCount('pre_enrollment_revisions', 2);
+    }
 
     #[TestWith(['APROBADO', 'VALIDA', 1])]
     #[TestWith(['DESAPROBADO', 'REQUIERE_AJUSTE', 0])]

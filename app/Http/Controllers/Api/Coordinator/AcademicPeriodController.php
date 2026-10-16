@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\SaveAcademicPeriodRequest;
 use App\Http\Resources\AcademicPeriodResource;
 use App\Models\AcademicPeriod;
-use App\Services\AcademicDemand;
 use App\UseCases\AcademicPeriods\ManageAcademicPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -44,12 +43,5 @@ class AcademicPeriodController extends Controller
         $manage->delete($period);
 
         return response()->json(['message' => 'Período eliminado.']);
-    }
-
-    public function demand(AcademicPeriod $period, AcademicDemand $demand): JsonResponse
-    {
-        Gate::authorize('update', $period);
-
-        return response()->json(['data' => $demand->forPeriod($period)]);
     }
 }

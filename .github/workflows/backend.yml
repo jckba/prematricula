@@ -1,0 +1,82 @@
+name: Backend quality
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: prematricula_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testing_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: testing
+      APP_DEBUG: false
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: prematricula_test
+      DB_USERNAME: postgres
+      DB_PASSWORD: testing_only
+      DB_URL: ''
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, fileinfo, mbstring, pdo_pgsql, simplexml, xml, zip, zlib, gd
+          coverage: none
+          tools: composer:v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: PDF inspection tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: Install locked backend dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+      - name: Configure isolated testing environment
+        run: |
+          cp .env.example .env
+          cp .env.testing.example .env.testing
+          php artisan key:generate --no-interaction
+          php artisan migrate --env=testing --force --no-interaction
+      - name: Check Composer and advisories
+        run: |
+          composer validate --strict --no-check-publish
+          composer audit --locked
+      - name: Check backend style
+        run: composer lint
+      - name: Static analysis
+        run: composer analyse
+      - name: Validate OpenAPI
+        run: |
+          python -m pip install -r requirements-quality.txt
+          python -m openapi_spec_validator OpenAPI/openapi.yaml
+          python -c "import json; from jsonschema import validate; validate(json.load(open('OpenAPI/Prematricula.postman_collection.json')), json.load(open('tests/Fixtures/postman-collection-v2.1.schema.json')))"
+      - name: Complete PostgreSQL test suite
+        run: php vendor/phpunit/phpunit/phpunit --log-junit storage/logs/junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: storage/logs/junit.xml

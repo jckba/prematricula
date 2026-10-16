@@ -10,22 +10,23 @@ class AcademicPeriodSeeder extends Seeder
 {
     public function run(): void
     {
-        AcademicPeriod::create([
-            'codigo' => '2026-I',
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
+        AcademicPeriod::firstOrCreate(['codigo' => '2026-I'], [
             'fecha_inicio' => '2026-04-13',
             'fecha_fin' => '2026-07-31',
             'estado' => AcademicPeriodStatus::CERRADO,
         ]);
 
-        AcademicPeriod::create([
-            'codigo' => '2026-II',
+        AcademicPeriod::firstOrCreate(['codigo' => '2026-II'], [
             'fecha_inicio' => '2026-08-24',
             'fecha_fin' => '2026-12-11',
             'estado' => AcademicPeriodStatus::EN_CURSO,
         ]);
 
-        AcademicPeriod::create([
-            'codigo' => '2027-I',
+        AcademicPeriod::firstOrCreate(['codigo' => '2027-I'], [
             'fecha_inicio' => '2027-04-12',
             'fecha_fin' => '2027-07-28',
 

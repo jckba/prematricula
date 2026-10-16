@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        DB::prohibitDestructiveCommands(! $this->app->environment('testing') ||
+            DB::connection()->getDriverName() !== 'pgsql' || DB::connection()->getDatabaseName() !== 'prematricula_test');
+
         RateLimiter::for('login', function (Request $request): array {
             $identifier = $request->is('api/*')
                 ? $request->input('identifier', $request->input('correo_institucional'))

@@ -170,35 +170,39 @@ class CurriculumValidator
         $path = [];
         $positions = [];
         $cyclic = [];
-        $visit = function (string $code) use (&$visit, &$visited, &$path, &$positions, &$cyclic, $graph): void {
-            if (isset($positions[$code])) {
-                foreach (array_slice($path, $positions[$code]) as $cycleCode) {
-                    $cyclic[$cycleCode] = true;
-                }
-
-                return;
-            }
-
-            if (isset($visited[$code])) {
-                return;
-            }
-
-            $visited[$code] = true;
-            $positions[$code] = count($path);
-            $path[] = $code;
-
-            foreach ($graph[$code] ?? [] as $prerequisite) {
-                $visit($prerequisite);
-            }
-
-            array_pop($path);
-            unset($positions[$code]);
-        };
-
         foreach (array_keys($graph) as $code) {
-            $visit((string) $code);
+            $this->visit((string) $code, $graph, $visited, $path, $positions, $cyclic);
         }
 
         return $cyclic;
+    }
+
+    /**
+     * @param  array<string, list<string>>  $graph
+     * @param  array<string, true>  $visited
+     * @param  list<string>  $path
+     * @param  array<string, int>  $positions
+     * @param  array<string, true>  $cyclic
+     */
+    private function visit(string $code, array $graph, array &$visited, array &$path, array &$positions, array &$cyclic): void
+    {
+        if (isset($positions[$code])) {
+            foreach (array_slice($path, $positions[$code]) as $cycleCode) {
+                $cyclic[$cycleCode] = true;
+            }
+
+            return;
+        }
+        if (isset($visited[$code])) {
+            return;
+        }
+        $visited[$code] = true;
+        $positions[$code] = count($path);
+        $path[] = $code;
+        foreach ($graph[$code] ?? [] as $prerequisite) {
+            $this->visit($prerequisite, $graph, $visited, $path, $positions, $cyclic);
+        }
+        array_pop($path);
+        unset($positions[$code]);
     }
 }

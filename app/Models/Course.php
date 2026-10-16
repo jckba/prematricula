@@ -28,6 +28,7 @@ class Course extends Model
         ];
     }
 
+    /** @return BelongsToMany<Course, $this> */
     public function prerequisites(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -38,6 +39,7 @@ class Course extends Model
         );
     }
 
+    /** @return BelongsToMany<Course, $this> */
     public function prerequisiteFor(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -48,16 +50,25 @@ class Course extends Model
         );
     }
 
+    /** @return HasMany<AcademicHistory, $this> */
     public function academicHistories(): HasMany
     {
         return $this->hasMany(AcademicHistory::class);
     }
 
+    /** @return HasMany<TeachingAssignment, $this> */
+    public function teachingAssignments(): HasMany
+    {
+        return $this->hasMany(TeachingAssignment::class);
+    }
+
+    /** @return BelongsToMany<PreEnrollmentRevision, $this> */
     public function preEnrollmentRevisions(): BelongsToMany
     {
         return $this->belongsToMany(PreEnrollmentRevision::class, 'pre_enrollment_revision_courses', 'course_id', 'revision_id');
     }
 
+    /** @return HasMany<PreEnrollmentDetail, $this> */
     public function preEnrollmentDetails(): HasMany
     {
         return $this->hasMany(PreEnrollmentDetail::class);

@@ -5,7 +5,10 @@ namespace App\Services;
 use App\Enums\RecordStatus;
 use App\Models\Course;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -29,7 +32,14 @@ class CurriculumCatalog
             DB::select('SELECT pg_advisory_xact_lock(?)', [82640101]);
             $courses = Course::query()->orderBy('id')->lockForUpdate()->get();
             $courses->load('prerequisites');
-            $courses->loadCount(['academicHistories', 'preEnrollmentDetails', 'preEnrollmentRevisions']);
+            $courses->loadCount(['academicHistories', 'preEnrollmentDetails', 'preEnrollmentRevisions',
+                'teachingAssignments' => function (Builder|Relation $assignments): Builder {
+                    if ($assignments instanceof Relation) {
+                        $assignments = $assignments->getQuery();
+                    }
+
+                    return $assignments->withoutGlobalScope(SoftDeletingScope::class);
+                }]);
 
             return $operation($courses);
         }, 3);
@@ -52,7 +62,7 @@ class CurriculumCatalog
 
     public function isProtected(Course $course): bool
     {
-        return $course->academic_histories_count > 0 || $course->pre_enrollment_details_count > 0 || $course->pre_enrollment_revisions_count > 0;
+        return $course->academic_histories_count > 0 || $course->pre_enrollment_details_count > 0 || $course->pre_enrollment_revisions_count > 0 || $course->teaching_assignments_count > 0;
     }
 
     /**

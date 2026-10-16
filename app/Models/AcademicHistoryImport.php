@@ -14,6 +14,7 @@ class AcademicHistoryImport extends Model
         return ['summary' => 'array'];
     }
 
+    /** @return HasMany<AcademicHistoryChange, $this> */
     public function changes(): HasMany
     {
         return $this->hasMany(AcademicHistoryChange::class);

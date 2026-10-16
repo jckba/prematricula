@@ -2,12 +2,17 @@
 
 use App\Http\Controllers\Api\AcademicHistoryController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Coordinator\AcademicConsultationController;
+use App\Http\Controllers\Api\Coordinator\AcademicDemandController;
 use App\Http\Controllers\Api\Coordinator\AcademicHistoryImportController;
 use App\Http\Controllers\Api\Coordinator\AcademicPeriodController;
 use App\Http\Controllers\Api\Coordinator\AccountController;
 use App\Http\Controllers\Api\Coordinator\CurriculumController;
 use App\Http\Controllers\Api\Coordinator\PreEnrollmentController as CoordinatorPreEnrollmentController;
 use App\Http\Controllers\Api\Coordinator\PreEnrollmentWindowController;
+use App\Http\Controllers\Api\Coordinator\TeacherController;
+use App\Http\Controllers\Api\Coordinator\TeachingAssignmentController;
+use App\Http\Controllers\Api\Coordinator\TeachingLoadController;
 use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\PreEnrollmentRevisionController;
 use App\Http\Controllers\Api\Student\PreEnrollmentController;
@@ -39,8 +44,7 @@ Route::prefix('v1')->group(function () {
         ]);
 
         Route::prefix('student')
-            ->middleware('role:ESTUDIANTE',
-                'student.profile')
+            ->middleware(['role:ESTUDIANTE', 'student.profile'])
             ->group(function () {
 
                 Route::get('academic-history', [AcademicHistoryController::class, 'index']);
@@ -113,9 +117,22 @@ Route::prefix('v1')->group(function () {
             ->group(function () {
 
                 Route::post('academic-periods', [AcademicPeriodController::class, 'store']);
+                Route::apiResource('teachers', TeacherController::class);
+                Route::get('teaching-assignments/{assignment}/history', [TeachingAssignmentController::class, 'history'])->withTrashed();
+                Route::apiResource('teaching-assignments', TeachingAssignmentController::class)->parameters(['teaching-assignments' => 'assignment']);
+                Route::get('academic-periods/{period}/teaching-load', [TeachingLoadController::class, 'summary']);
+                Route::get('academic-periods/{period}/teaching-load/teachers', [TeachingLoadController::class, 'teachers']);
+                Route::get('academic-periods/{period}/teaching-load/teachers/{teacher}', [TeachingLoadController::class, 'teacher']);
+                Route::get('academic-periods/{period}/teaching-load/courses', [TeachingLoadController::class, 'courses']);
+                Route::get('academic-periods/{period}/teaching-load/courses/{course}', [TeachingLoadController::class, 'course']);
                 Route::patch('academic-periods/{period}', [AcademicPeriodController::class, 'update']);
                 Route::delete('academic-periods/{period}', [AcademicPeriodController::class, 'destroy']);
-                Route::get('academic-periods/{period}/demand', [AcademicPeriodController::class, 'demand']);
+                Route::get('students', [AcademicConsultationController::class, 'index']);
+                Route::get('students/{student:codigo_universitario}/academic', [AcademicConsultationController::class, 'show']);
+                Route::get('academic-periods/{period}/demand', [AcademicDemandController::class, 'index']);
+                Route::get('academic-periods/{period}/demand/export', [AcademicDemandController::class, 'export']);
+                Route::get('academic-periods/{period}/demand/courses/{course}/students', [AcademicDemandController::class, 'students']);
+                Route::get('academic-periods/{period}/summary', [AcademicDemandController::class, 'summary']);
                 Route::post('academic-periods/{period}/windows', [PreEnrollmentWindowController::class, 'store']);
                 Route::get('academic-history', [AcademicHistoryController::class, 'index']);
                 Route::get('academic-history/template', [AcademicHistoryImportController::class, 'template']);

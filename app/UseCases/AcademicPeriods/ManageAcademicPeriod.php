@@ -31,7 +31,7 @@ class ManageAcademicPeriod
                 'estado' => ['required', Rule::enum(AcademicPeriodStatus::class)],
             ])->validate();
 
-            if ($current !== null && ($current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists()) &&
+            if ($current !== null && ($current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists() || $current->teachingAssignments()->withTrashed()->exists()) &&
                 ($current->codigo !== $merged['codigo'] || $current->fecha_inicio->toDateString() !== $merged['fecha_inicio'] || $current->fecha_fin->toDateString() !== $merged['fecha_fin'])) {
                 throw ValidationException::withMessages(['period' => 'Un período referenciado conserva código y fechas de clases. Puede administrar su estado y añadir ventanas.']);
             }
@@ -50,7 +50,7 @@ class ManageAcademicPeriod
     {
         $this->lock->transaction(function () use ($period): void {
             $current = AcademicPeriod::query()->lockForUpdate()->findOrFail($period->id);
-            if ($current->windows()->exists() || $current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists()) {
+            if ($current->windows()->exists() || $current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists() || $current->teachingAssignments()->withTrashed()->exists()) {
                 abort(409, 'No se puede eliminar un período referenciado.');
             }
             $current->delete();
