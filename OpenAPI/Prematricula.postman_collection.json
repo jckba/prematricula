@@ -1,0 +1,1059 @@
+{
+  "info": {
+    "name": "Prematrícula — API v1: registro, revisiones y constancias",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Backend Laravel/Sanctum. Sin credenciales ni tokens incluidos. Configura base_url (incluye /api/v1), identifier y password. Ejecuta Login como coordinador para modificar/importar. En Validar y Confirmar selecciona exactamente el mismo archivo. Consulta docs/curriculum.md para límites, errores y política de protección histórica. Ambos cargos coordinadores tienen los mismos permisos. Períodos, ventanas e historial: docs/academic-process.md. Fechas de ventana locales en zona institucional; reapertura siempre global. Las notas no determinan aprobación por umbral. Flujo definitivo: BORRADOR -> ENVIADA sin aprobación individual. Ver docs/student.md. La corrección mantiene la revisión vigente y crea un borrador; el reenvío exitoso emite otra constancia."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "identifier",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sha256",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "catalog_fingerprint",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "course_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "period_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "pre_enrollment_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "import_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "history_sha256",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "history_fingerprint",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "detail_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "revision_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{identifier}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Correo institucional o código universitario como string. Configura las variables identifier/password; no guardes secretos en una colección compartida."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('token');",
+                  "if (pm.response.code === 200) {",
+                  "    const payload = pm.response.json();",
+                  "    pm.collectionVariables.set('token', payload.data.token);",
+                  "}",
+                  "pm.test('Login correcto', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usuario actual",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/me"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout (revocar token actual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/logout"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { pm.collectionVariables.unset('token'); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Catálogo",
+      "item": [
+        {
+          "name": "Consultar catálogo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses?per_page=20"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar curso por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Modificar datos académicos (curso no utilizado)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/courses/{{course_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"horas_teoria\": \"2.50\",\n  \"prerrequisitos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Solo coordinadores. Prerrequisitos reemplaza la lista completa. Cursos utilizados en historial o prematrícula solo permiten cambios de estado. No renombrar codigo."
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar estado (también para curso utilizado)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/courses/{{course_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"INACTIVO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Malla curricular XLSX — coordinadores",
+      "item": [
+        {
+          "name": "Descargar plantilla XLSX",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/curriculum/template"
+          },
+          "response": []
+        },
+        {
+          "name": "Validar archivo (sin persistencia)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/curriculum/validate",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": null
+                }
+              ]
+            },
+            "description": "Selecciona un .xlsx. Revisa el informe. Solo si la validación es válida se guardan SHA-256 y huella base para confirmar."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('sha256');",
+                  "pm.collectionVariables.unset('catalog_fingerprint');",
+                  "if (pm.response.code === 200) {",
+                  "    const report = pm.response.json().data;",
+                  "    if (report.valid) {",
+                  "        pm.collectionVariables.set('sha256', report.sha256);",
+                  "        pm.collectionVariables.set('catalog_fingerprint', report.catalog_fingerprint);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar importación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/curriculum/import",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": null
+                },
+                {
+                  "key": "sha256",
+                  "type": "text",
+                  "value": "{{sha256}}"
+                },
+                {
+                  "key": "catalog_fingerprint",
+                  "type": "text",
+                  "value": "{{catalog_fingerprint}}"
+                }
+              ]
+            },
+            "description": "Selecciona el mismo archivo validado. Hashes guardados automáticamente por Validar. Se revalida bajo bloqueo y se persiste todo o nada. 409: vuelve a validar; 422: corrige datos. Reenvío idéntico no duplica registros."
+          },
+          "response": []
+        },
+        {
+          "name": "Exportar malla XLSX",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/curriculum/export",
+            "description": "Usa Send and Download. Incluye cursos activos e inactivos, ocho columnas sin estado; conserva códigos de texto y horas fraccionarias."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Períodos y ventanas globales",
+      "item": [
+        {
+          "name": "Consultar períodos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/academic-periods"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar período",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/academic-periods/{{period_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear período",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"2027-I\",\n  \"fecha_inicio\": \"2027-04-01\",\n  \"fecha_fin\": \"2027-08-01\",\n  \"estado\": \"PLANIFICACION\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Habilitar proceso del período",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"PREMATRICULA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar período sin referencias",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar ventanas históricas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/academic-periods/{{period_id}}/windows"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear ventana ordinaria (fechas locales)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}/windows",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"ORDINARIA\",\n  \"fecha_inicio\": \"2026-10-16 09:00:00\",\n  \"fecha_fin\": \"2026-10-18 18:00:00\",\n  \"motivo\": \"Apertura ordinaria\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reapertura extraordinaria para TODOS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}/windows",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"EXTRAORDINARIA\",\n  \"fecha_inicio\": \"2026-10-20 09:00:00\",\n  \"fecha_fin\": \"2026-10-22 18:00:00\",\n  \"motivo\": \"Resultados oficiales publicados\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar demanda académica válida",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-periods/{{period_id}}/demand"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Historial académico XLSX y auditoría",
+      "item": [
+        {
+          "name": "Consultar historial propio (token estudiante)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/academic-history"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar historial (coordinador)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-history"
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar plantilla de resultados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-history/template"
+          },
+          "response": []
+        },
+        {
+          "name": "Validar resultados (sin persistencia)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-history/validate",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": null
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('history_sha256');",
+                  "pm.collectionVariables.unset('history_fingerprint');",
+                  "if (pm.response.code === 200) {",
+                  "    const report = pm.response.json().data;",
+                  "    if (report.valid) {",
+                  "        pm.collectionVariables.set('history_sha256', report.sha256);",
+                  "        pm.collectionVariables.set('history_fingerprint', report.history_fingerprint);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar resultados (mismo archivo validado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-history/import",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": null
+                },
+                {
+                  "key": "sha256",
+                  "type": "text",
+                  "value": "{{history_sha256}}"
+                },
+                {
+                  "key": "history_fingerprint",
+                  "type": "text",
+                  "value": "{{history_fingerprint}}"
+                },
+                {
+                  "key": "motivo",
+                  "type": "text",
+                  "value": "Carga de acta oficial"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { pm.collectionVariables.set('import_id', pm.response.json().data.import_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar lotes importados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-history/imports"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar auditoría de cambios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/academic-history/imports/{{import_id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Prematrícula estudiantil — flujo definitivo",
+      "item": [
+        {
+          "name": "Consultar cursos elegibles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollment/available-courses"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear/obtener borrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollment"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if ([200, 201].includes(pm.response.code)) { pm.collectionVariables.set('pre_enrollment_id', pm.response.json().data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar prematrícula actual",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollment"
+          },
+          "response": []
+        },
+        {
+          "name": "Agregar curso elegible",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollment/courses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": {{course_id}},\n  \"preferencia_turno\": \"MANANA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('detail_id', pm.response.json().data.detail_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar preferencia del borrador",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollment/courses/{{detail_id}}/preference",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferencia_turno\": \"TARDE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Quitar curso del borrador",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollment/courses/{{detail_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar envío o reenvío (sin aprobación)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollment/submit"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.collectionVariables.set('pre_enrollment_id', data.id);",
+                  "    pm.collectionVariables.set('revision_id', data.current_revision_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar/retomar corrección extraordinaria explícita",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollments/{{pre_enrollment_id}}/corrections"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar historial de solicitudes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollments"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar solicitud propia por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollments/{{pre_enrollment_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar revisiones enviadas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollments/{{pre_enrollment_id}}/revisions"
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar constancia vigente (Send and Download)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollments/{{pre_enrollment_id}}/receipt"
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar constancia histórica",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/student/pre-enrollments/{{pre_enrollment_id}}/revisions/{{revision_id}}/receipt"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Consulta de prematrículas — coordinadores, sin aprobación",
+      "item": [
+        {
+          "name": "Consultar registros",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/pre-enrollments"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar solicitud y revisión vigente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/pre-enrollments/{{pre_enrollment_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar revisiones",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/pre-enrollments/{{pre_enrollment_id}}/revisions"
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar constancia vigente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/pre-enrollments/{{pre_enrollment_id}}/receipt"
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar constancia histórica",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/coordinator/pre-enrollments/{{pre_enrollment_id}}/revisions/{{revision_id}}/receipt"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

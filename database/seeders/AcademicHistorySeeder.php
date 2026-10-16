@@ -13,6 +13,10 @@ class AcademicHistorySeeder extends Seeder
 {
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
         $student = Student::where(
             'codigo_universitario',
             '1452700722'

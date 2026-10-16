@@ -18,9 +18,11 @@ use App\UseCases\PreEnrollment\GetOrCreateDraft;
 use App\UseCases\PreEnrollment\RemoveCourse;
 use App\UseCases\PreEnrollment\SubmitPreEnrollment;
 use App\UseCases\PreEnrollment\UpdateSchedulePreference;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class PreEnrollmentController extends Controller
 {
@@ -33,7 +35,7 @@ class PreEnrollmentController extends Controller
 
         $period = $currentPeriod->get();
 
-        $courses = $getAvailableCourses($student);
+        $courses = $getAvailableCourses($student, $period);
 
         return response()->json([
             'data' => [
@@ -60,22 +62,47 @@ class PreEnrollmentController extends Controller
             ], 403);
         }
 
-        $period = $currentPeriod->get();
-
-        $preEnrollment = $getOrCreateDraft(
-            $student,
-            $period
-        );
+        $filters = $request->validate(['academic_period_id' => ['sometimes', 'integer', 'min:1']]);
+        if (isset($filters['academic_period_id'])) {
+            $preEnrollment = $student->preEnrollmentRequests()->where('academic_period_id', $filters['academic_period_id'])->firstOrFail();
+        } else {
+            try {
+                $period = $currentPeriod->get();
+                $preEnrollment = $student->preEnrollmentRequests()->where('academic_period_id', $period->id)->first()
+                    ?? $getOrCreateDraft($student, $period);
+            } catch (DomainException $exception) {
+                $preEnrollment = $student->preEnrollmentRequests()->orderByDesc('id')->first();
+                if ($preEnrollment === null) {
+                    throw $exception;
+                }
+            }
+        }
 
         $preEnrollment->load([
             'student',
             'academicPeriod',
             'details.course',
+            'academicValidation',
+            'currentRevision',
         ]);
 
         return new PreEnrollmentResource(
             $preEnrollment
         );
+    }
+
+    public function store(Request $request, GetOrCreateDraft $getOrCreateDraft, CurrentPreEnrollmentPeriod $currentPeriod): PreEnrollmentResource
+    {
+        $preEnrollment = $getOrCreateDraft($request->user()->student, $currentPeriod->get());
+
+        return new PreEnrollmentResource($preEnrollment->load(['student', 'academicPeriod', 'details.course', 'academicValidation', 'currentRevision']));
+    }
+
+    public function detail(PreEnrollmentRequest $preEnrollment): PreEnrollmentResource
+    {
+        Gate::authorize('view', $preEnrollment);
+
+        return new PreEnrollmentResource($preEnrollment->load(['student', 'academicPeriod', 'details.course', 'academicValidation', 'currentRevision']));
     }
 
     public function addCourse(
@@ -144,7 +171,7 @@ class PreEnrollmentController extends Controller
             ->preEnrollmentRequest;
 
         if ($preEnrollment->student_id !== $student->id) {
-            abort(403);
+            abort(404);
         }
 
         $removeCourse(
@@ -175,7 +202,7 @@ class PreEnrollmentController extends Controller
                 ->preEnrollmentRequest
                 ->student_id !== $student->id
         ) {
-            abort(403);
+            abort(404);
         }
 
         $preference = SchedulePreference::from(
@@ -236,6 +263,8 @@ class PreEnrollmentController extends Controller
             'student',
             'academicPeriod',
             'details.course',
+            'academicValidation',
+            'currentRevision',
         ]);
 
         return new PreEnrollmentResource(
@@ -254,6 +283,8 @@ class PreEnrollmentController extends Controller
                 'student',
                 'academicPeriod',
                 'details.course',
+                'academicValidation',
+                'currentRevision',
                 'reviewer',
             ])
             ->orderByDesc('created_at')

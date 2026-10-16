@@ -14,13 +14,16 @@ class StudentSeeder extends Seeder
      */
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
         $user = User::where(
             'correo_institucional',
             'estudiante@unitru.edu.pe'
         )->firstOrFail();
 
-        Student::create([
-            'user_id' => $user->id,
+        Student::firstOrCreate(['user_id' => $user->id], [
             'codigo_universitario' => '1452700722',
             'nombres' => 'Alumno',
             'apellidos' => 'Prueba',

@@ -2,20 +2,25 @@
 
 namespace App\UseCases\PreEnrollment;
 
-use App\Enums\PreEnrollmentStatus;
 use App\Enums\RecordStatus;
 use App\Enums\SchedulePreference;
 use App\Models\Course;
 use App\Models\PreEnrollmentDetail;
 use App\Models\PreEnrollmentRequest;
+use App\Services\AcademicProcessLock;
+use App\Services\PreEnrollmentEditing;
 use App\Services\PreEnrollmentPeriodValidator;
+use App\Services\RevalidatePreEnrollments;
 use DomainException;
 
 class AddCourse
 {
     public function __construct(
         private readonly GetAvailableCourses $getAvailableCourses,
-        private readonly PreEnrollmentPeriodValidator $periodValidator
+        private readonly PreEnrollmentPeriodValidator $periodValidator,
+        private readonly AcademicProcessLock $lock,
+        private readonly PreEnrollmentEditing $editing,
+        private readonly RevalidatePreEnrollments $revalidate,
     ) {}
 
     public function __invoke(
@@ -23,7 +28,17 @@ class AddCourse
         Course $course,
         SchedulePreference $preference = SchedulePreference::SIN_PREFERENCIA
     ): PreEnrollmentDetail {
-        $request->loadMissing([
+        return $this->lock->transaction(function () use ($request, $course, $preference): PreEnrollmentDetail {
+            $result = $this->add($request->refresh(), $course->refresh(), $preference);
+            $this->revalidate->evaluate($request);
+
+            return $result;
+        });
+    }
+
+    private function add(PreEnrollmentRequest $request, Course $course, SchedulePreference $preference): PreEnrollmentDetail
+    {
+        $request->load([
             'student',
             'academicPeriod',
             'details.course',
@@ -33,7 +48,7 @@ class AddCourse
             $request->academicPeriod
         );
 
-        if ($request->estado !== PreEnrollmentStatus::BORRADOR) {
+        if (! $this->editing->allowed($request)) {
             throw new DomainException(
                 'Solo se pueden modificar solicitudes en estado BORRADOR.'
             );
@@ -56,7 +71,7 @@ class AddCourse
 
         if (
             ! $this->getAvailableCourses
-                ->isAvailable($request->student, $course)
+                ->isAvailable($request->student, $course, $request->academicPeriod)
         ) {
             throw new DomainException(
                 'El estudiante no cumple los requisitos para seleccionar este curso.'

@@ -1,12 +1,16 @@
 <?php
 
+use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\RequireStudentProfile;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -22,10 +26,31 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'student.profile' => RequireStudentProfile::class,
+            'user.active' => EnsureActiveUser::class,
         ]);
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+
+        $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->expectsJson());
+        $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'token', 'access_token']);
+
+        $exceptions->report(function (QueryException $exception): bool {
+            Log::error('Error de base de datos.', [
+                'connection' => $exception->connectionName,
+                'sqlstate' => $exception->errorInfo[0] ?? null,
+            ]);
+
+            return false;
+        });
+
+        $exceptions->render(function (QueryException $exception, Request $request): ?JsonResponse {
+            if ($request->is('api/*')) {
+                return response()->json(['message' => 'No se pudo completar la operación.'], 500);
+            }
+
+            return null;
+        });
 
         $exceptions->render(
             function (

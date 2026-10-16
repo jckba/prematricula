@@ -4,12 +4,9 @@ namespace App\Http\Controllers\Api\Coordinator;
 
 use App\Enums\PreEnrollmentStatus;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\RejectPreEnrollmentRequest;
+use App\Http\Requests\Api\ListPreEnrollmentsRequest;
 use App\Http\Resources\PreEnrollmentResource;
 use App\Models\PreEnrollmentRequest;
-use App\UseCases\PreEnrollment\ApprovePreEnrollment;
-use App\UseCases\PreEnrollment\RejectPreEnrollment;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class PreEnrollmentController extends Controller
@@ -22,6 +19,8 @@ class PreEnrollmentController extends Controller
                 'student',
                 'academicPeriod',
                 'details.course',
+                'academicValidation',
+                'currentRevision',
             ]);
 
         $status = $request->validated('estado');
@@ -29,10 +28,8 @@ class PreEnrollmentController extends Controller
         if ($status !== null) {
             $query->where('estado', $status);
         } else {
-            $query->where(
-                'estado',
-                PreEnrollmentStatus::ENVIADA
-            );
+            $query->where(fn ($query) => $query->where('estado', PreEnrollmentStatus::ENVIADA)
+                ->orWhere(fn ($draft) => $draft->where('estado', PreEnrollmentStatus::BORRADOR)->whereNotNull('current_revision_id')));
         }
 
         return PreEnrollmentResource::collection(
@@ -49,56 +46,13 @@ class PreEnrollmentController extends Controller
             'student',
             'academicPeriod',
             'details.course',
+            'academicValidation',
+            'currentRevision',
             'reviewer',
         ]);
 
         return new PreEnrollmentResource(
             $preEnrollment
-        );
-    }
-
-    public function approve(
-        Request $request,
-        PreEnrollmentRequest $preEnrollment,
-        ApprovePreEnrollment $approvePreEnrollment
-    ): PreEnrollmentResource {
-        $result = $approvePreEnrollment(
-            $preEnrollment,
-            $request->user()
-        );
-
-        $result->load([
-            'student',
-            'academicPeriod',
-            'details.course',
-            'reviewer',
-        ]);
-
-        return new PreEnrollmentResource(
-            $result
-        );
-    }
-
-    public function reject(
-        RejectPreEnrollmentRequest $request,
-        PreEnrollmentRequest $preEnrollment,
-        RejectPreEnrollment $rejectPreEnrollment
-    ): PreEnrollmentResource {
-        $result = $rejectPreEnrollment(
-            $preEnrollment,
-            $request->user(),
-            $request->string('comentario')->toString()
-        );
-
-        $result->load([
-            'student',
-            'academicPeriod',
-            'details.course',
-            'reviewer',
-        ]);
-
-        return new PreEnrollmentResource(
-            $result
         );
     }
 }

@@ -20,14 +20,23 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'identifier' => [
+                'required_without:correo_institucional',
+                'string',
+                'max:255',
+                'prohibits:correo_institucional',
+            ],
             'correo_institucional' => [
-                'required',
+                'required_without:identifier',
+                'string',
                 'email',
                 'max:255',
+                'prohibits:identifier',
             ],
             'password' => [
                 'required',
                 'string',
+                'max:1024',
             ],
         ];
     }

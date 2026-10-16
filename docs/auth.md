@@ -2,11 +2,13 @@
 
 La autenticación utiliza **Laravel Sanctum** mediante tokens Bearer (`Authorization: Bearer <token>`).
 
+Contrato actualizado y gestión de cuentas: [OpenAPI/API.md](../OpenAPI/API.md) y [OpenAPI 3.1](../OpenAPI/openapi.yaml).
+
 ---
 
 ## 1. Iniciar Sesión (`POST /login`)
 
-Inicia sesión con correo institucional y contraseña. Retorna el token de acceso Sanctum y la información básica del usuario autenticado.
+Inicia sesión con `identifier` (correo institucional o código universitario como string) y contraseña. Se mantiene temporalmente `correo_institucional` como alternativa exclusiva a `identifier`: enviar ambos devuelve 422. Retorna el token Sanctum, su vencimiento y la identidad pública.
 
 ### Endpoint
 `POST /api/v1/login`
@@ -23,15 +25,16 @@ Content-Type: application/json
 ### Request Body
 ```json
 {
-  "correo_institucional": "student@test.edu.pe",
+  "identifier": "student@test.edu.pe",
   "password": "password"
 }
 ```
 
 | Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `correo_institucional` | `string` (email) | Sí | Correo institucional del usuario (máx. 255 caracteres). |
-| `password` | `string` | Sí | Contraseña del usuario. |
+| `identifier` | `string` | Sí, salvo alias antiguo | Correo institucional o código universitario; conserva ceros iniciales (máx. 255 caracteres). |
+| `correo_institucional` | `string` (email) | Solo como alternativa | Alias temporal; no puede enviarse junto a `identifier`. |
+| `password` | `string` | Sí | Contraseña del usuario (máx. 1024 caracteres). |
 
 ### Respuestas
 
@@ -40,11 +43,14 @@ Content-Type: application/json
 {
   "message": "Autenticación correcta.",
   "data": {
-    "token": "1|AbCdEf1234567890...",
+    "token": "<token de acceso>",
+    "expires_at": "2026-10-16T18:00:00.000000Z",
     "user": {
       "id": 1,
       "correo_institucional": "student@test.edu.pe",
-      "rol": "ESTUDIANTE"
+      "rol": "ESTUDIANTE",
+      "estado": "ACTIVO",
+      "cargo": null
     }
   }
 }
@@ -57,20 +63,19 @@ Content-Type: application/json
 }
 ```
 
-#### `403 Forbidden` (Usuario inactivo)
-```json
-{
-  "message": "El usuario se encuentra inactivo."
-}
-```
+El mismo 401 se devuelve para identificadores inexistentes o ambiguos, usuarios inactivos y estudiantes sin perfil activo, sin emitir tokens.
+
+#### `429 Too Many Requests`
+
+Cinco intentos por identificador/IP y treinta por IP cada minuto. Incluye `Retry-After`. El alias y el login web comparten los límites.
 
 #### `422 Unprocessable Content` (Errores de validación)
 ```json
 {
-  "message": "The correo institucional field is required.",
+  "message": "Los datos enviados no son válidos.",
   "errors": {
-    "correo_institucional": [
-      "The correo institucional field is required."
+    "identifier": [
+      "The identifier field is required when correo institucional is not present."
     ],
     "password": [
       "The password field is required."
@@ -106,7 +111,8 @@ Authorization: Bearer <TOKEN>
     "id": 1,
     "correo_institucional": "student@test.edu.pe",
     "rol": "ESTUDIANTE",
-    "estado": "ACTIVO"
+    "estado": "ACTIVO",
+    "cargo": null
   }
 }
 ```
@@ -123,6 +129,10 @@ Authorization: Bearer <TOKEN>
 ## 3. Cerrar Sesión (`POST /logout`)
 
 Invalida y elimina el token de acceso actual en el backend.
+
+Los tokens de otros dispositivos permanecen. Reutilizar el token revocado devuelve 401. Los tokens duran ocho horas, incluidos los antiguos sin vencimiento explícito; la limpieza diaria requiere el scheduler de Laravel. Cambios de contraseña, correo o estado desde gestión de cuentas revocan todos los tokens del destinatario.
+
+Todas las rutas API protegidas verifican actividad. Detectar una cuenta desactivada o un perfil estudiantil ausente/inactivo devuelve 403 y revoca sus tokens. Director y secretaria conservan el rol `COORDINADOR`, con cargos `DIRECTOR_ESCUELA` / `SECRETARIA` y los mismos permisos.
 
 ### Endpoint
 `POST /api/v1/logout`

@@ -15,6 +15,10 @@ class CourseResource extends JsonResource
             'nombre' => $this->nombre,
             'creditos' => $this->creditos,
             'ciclo' => $this->ciclo,
+            'horas_teoria' => $this->horas_teoria,
+            'horas_practica' => $this->horas_practica,
+            'horas_laboratorio' => $this->horas_laboratorio,
+            'estado' => $this->estado->value,
 
             'prerrequisitos' => $this->whenLoaded(
                 'prerequisites',

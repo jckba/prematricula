@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\RecordStatus;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,7 +15,7 @@ class RequireStudentProfile
     ): Response {
         $user = $request->user();
 
-        if ($user === null || $user->student === null) {
+        if ($user === null || $user->student?->estado !== RecordStatus::ACTIVO) {
             return response()->json([
                 'message' => 'El usuario autenticado no tiene un perfil de estudiante asociado.',
             ], 403);

@@ -6,6 +6,8 @@ Esta documentación está diseñada específicamente para que los desarrolladore
 
 ## 📌 Índice de Documentación
 
+Contrato actualizado de autenticación, cuentas y catálogo: [API.md](../OpenAPI/API.md), [OpenAPI 3.1](../OpenAPI/openapi.yaml) y [colección Postman](../OpenAPI/Prematricula.postman_collection.json).
+
 1. [Guía de Autenticación (`docs/auth.md`)](./auth.md)
    - Login con credenciales institucionales.
    - Consulta de perfil y rol (`/me`).
@@ -15,7 +17,7 @@ Esta documentación está diseñada específicamente para que los desarrolladore
 2. [Módulo de Estudiante (`docs/student.md`)](./student.md)
    - Consulta de cursos disponibles y prerrequisitos del periodo activo.
    - Gestión del borrador de prematrícula (creación automática, visualización).
-   - Agregar curso con preferencia de turno (`MANANA`, `TARDE`, `NOCHE`, `SIN_PREFERENCIA`).
+   - Agregar curso con preferencia de turno (`MANANA`, `TARDE`, `SIN_PREFERENCIA`).
    - Actualizar preferencia de turno de un curso seleccionado.
    - Eliminar curso de la prematrícula.
    - Envío final de la prematrícula para revisión.
@@ -24,12 +26,22 @@ Esta documentación está diseñada específicamente para que los desarrolladore
 3. [Módulo de Coordinador (`docs/coordinator.md`)](./coordinator.md)
    - Listado paginado de prematrículas (con filtro por estado: `BORRADOR`, `ENVIADA`, `APROBADA`, `RECHAZADA`).
    - Detalle completo de una solicitud de prematrícula.
-   - Aprobación de solicitudes.
-   - Rechazo de solicitudes con comentario justificado obligatorio.
+   - Consulta de validación académica, revisiones y PDFs vigentes/históricos.
+   - No hay aprobación/rechazo posterior al registro ENVIADA.
 
 4. [Enums, Estados y Tipos TypeScript (`docs/enums-and-types.md`)](./enums-and-types.md)
    - Diccionario de valores válidos para roles, estados de solicitud, turnos y periodos.
    - Definiciones de interfaces TypeScript listas para copiar y pegar en el proyecto frontend.
+
+5. [Malla curricular y catálogo académico (`docs/curriculum.md`)](./curriculum.md)
+   - Catálogo, horas académicas semanales y prerrequisitos por código.
+   - Plantilla, validación previa, importación transaccional y exportación `.xlsx`.
+   - Política de actualización segura y protección del historial.
+
+6. [Períodos, ventanas e historial académico (`docs/academic-process.md`)](./academic-process.md)
+   - Calendario independiente de clases y ventanas ordinarias/extraordinarias globales.
+   - Resultados oficiales XLSX, auditoría y revalidación de prematrículas.
+   - Demanda válida y corrección extraordinaria conservando constancias.
 
 ---
 
@@ -125,13 +137,12 @@ Ocurre cuando el usuario autenticado no posee el rol adecuado para la ruta (ej. 
    ├── 3. GET  /api/v1/student/pre-enrollment ──────────────────► Obtiene / Crea borrador actual
    ├── 4. POST /api/v1/student/pre-enrollment/courses ──────────► Agrega cursos (valida prerreq. y créditos)
    ├── 5. PATCH/DELETE cursos según preferencia del estudiante
-   └── 6. POST /api/v1/student/pre-enrollment/submit ───────────► Envía solicitud (Estado: ENVIADA)
+   └── 6. POST /api/v1/student/pre-enrollment/submit ───────────► Registra ENVIADA, revisión y PDF
 
 [Coordinador]
    │
    ├── 1. POST /api/v1/login ─────────────► Obtiene Token Sanctum y Rol "COORDINADOR"
-   ├── 2. GET  /api/v1/coordinator/pre-enrollments?estado=ENVIADA ──► Lista solicitudes pendientes
+   ├── 2. GET  /api/v1/coordinator/pre-enrollments?estado=ENVIADA ──► Consulta registros enviados
    ├── 3. GET  /api/v1/coordinator/pre-enrollments/{id} ────────► Revisa detalle de cursos y turnos
-   ├── 4a. POST /api/v1/coordinator/pre-enrollments/{id}/approve ─► Aprueba (Estado: APROBADA)
-   └── 4b. POST /api/v1/coordinator/pre-enrollments/{id}/reject ──► Rechaza con comentario (Estado: RECHAZADA)
+   └── 4. GET /api/v1/coordinator/pre-enrollments/{id}/receipt ─► Descarga constancia vigente
 ```

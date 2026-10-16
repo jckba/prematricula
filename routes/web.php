@@ -14,7 +14,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [
         AuthController::class,
         'login',
-    ])->name('login.store');
+    ])->middleware('throttle:login')->name('login.store');
 });
 
 Route::middleware('auth')->group(function () {

@@ -13,6 +13,15 @@ class PreEnrollmentResource extends JsonResource
             'id' => $this->id,
 
             'estado' => $this->estado->value,
+            'correccion_en_progreso' => $this->correction_window_id !== null,
+            'current_revision_id' => $this->current_revision_id,
+            'revision_vigente' => new PreEnrollmentRevisionResource($this->whenLoaded('currentRevision')),
+            'validacion_academica' => $this->whenLoaded('academicValidation', fn () => $this->academicValidation === null ? null : [
+                'estado' => $this->academicValidation->estado->value,
+                'revision_id' => $this->academicValidation->revision_id,
+                'cursos' => $this->academicValidation->cursos,
+                'evaluated_at' => $this->academicValidation->evaluated_at->toISOString(),
+            ]),
 
             'fecha_envio' => $this->fecha_envio?->toISOString(),
 

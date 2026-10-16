@@ -1,0 +1,1950 @@
+openapi: 3.1.0
+info:
+  title: Prematrícula - catálogo, períodos e historial académico
+  version: 1.3.0
+  description: >-
+    Sanctum y una sola malla vigente, sin versiones de planes. La gestión de
+    cuentas se describe en API.md y la política de cursos en ../docs/curriculum.md.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/login:
+    post:
+      operationId: login
+      summary: Login con correo institucional o código universitario
+      security: []
+      description: >-
+        Enviar identifier o el alias temporal correo_institucional, nunca ambos.
+        El código se envía como string y se resuelve mediante Student -> User.
+        Credenciales incorrectas, identificadores ambiguos, usuarios inactivos
+        y estudiantes sin perfil activo reciben el mismo 401.
+        Límites por minuto: 5 por identificador/IP y 30 por IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/LoginRequest'
+                - $ref: '#/components/schemas/LegacyLoginRequest'
+            examples:
+              email:
+                value: {identifier: estudiante@unitru.edu.pe, password: password}
+              code:
+                value: {identifier: '0014527007', password: password}
+              legacy:
+                value: {correo_institucional: estudiante@unitru.edu.pe, password: password}
+      responses:
+        '200':
+          description: Token e identidad pública
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, data]
+                properties:
+                  message:
+                    type: string
+                    const: Autenticación correcta.
+                  data:
+                    type: object
+                    required: [token, expires_at, user]
+                    properties:
+                      token:
+                        type: string
+                        description: Se entrega una sola vez. No registrar en logs.
+                      expires_at:
+                        type: string
+                        format: date-time
+                        description: Vencimiento a las ocho horas.
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Credenciales incorrectas, sin revelar existencia o estado de la cuenta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example: {message: Credenciales incorrectas.}
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: Límite de peticiones excedido
+          headers:
+            Retry-After:
+              description: Segundos antes de reintentar
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+  /api/v1/me:
+    get:
+      operationId: currentUser
+      summary: Consultar identidad autenticada
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Identidad del usuario activo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/DisabledAccount'
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+  /api/v1/logout:
+    post:
+      operationId: logout
+      summary: Revocar únicamente el token actual
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token eliminado; no puede reutilizarse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example: {message: Sesión cerrada correctamente.}
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/DisabledAccount'
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+  /api/v1/courses:
+    get:
+      operationId: listCourses
+      summary: Catálogo paginado; estudiantes solo ven cursos activos
+      parameters:
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 100}
+          description: Búsqueda literal de código o nombre; sin comodines.
+        - name: ciclo
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 32767}
+          description: Filtro de catálogo, no límite de elegibilidad.
+        - name: estado
+          in: query
+          schema: {type: string, enum: [ACTIVO, INACTIVO]}
+          description: Estudiantes no pueden solicitar INACTIVO (403).
+        - name: per_page
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, default: 1}
+      responses:
+        '200':
+          description: Cursos ordenados por ciclo, código e ID
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/Course'}
+                  links:
+                    type: object
+                    properties:
+                      first: {type: string, format: uri}
+                      last: {type: string, format: uri}
+                      prev: {type: [string, 'null'], format: uri}
+                      next: {type: [string, 'null'], format: uri}
+                  meta:
+                    type: object
+                    properties:
+                      current_page: {type: integer}
+                      last_page: {type: integer}
+                      per_page: {type: integer}
+                      total: {type: integer}
+                      from: {type: [integer, 'null']}
+                      to: {type: [integer, 'null']}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '500': {$ref: '#/components/responses/DatabaseError'}
+  /api/v1/courses/{course}:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      operationId: showCourse
+      summary: Curso por ID y sus prerrequisitos
+      responses:
+        '200': {$ref: '#/components/responses/CourseResponse'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/DisabledAccount'}
+        '404': {$ref: '#/components/responses/CourseNotFound'}
+        '500': {$ref: '#/components/responses/DatabaseError'}
+  /api/v1/coordinator/courses/{course}:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    patch:
+      operationId: updateCourse
+      summary: Modificar datos permitidos; exclusivo para coordinadores
+      description: >-
+        Cursos utilizados en historial o cualquier prematrícula, incluso borrador,
+        conservan todos los datos académicos y prerrequisitos; solo pueden cambiar
+        estado. Códigos no se renombran. Cambios del grafo se validan bajo bloqueo
+        transaccional. Errores de dominio usan CurriculumReport con row 0.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CourseUpdate'}
+            example: {horas_teoria: '2.50', prerrequisitos: ['00101', FIS101]}
+      responses:
+        '200': {$ref: '#/components/responses/CourseResponse'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/CourseNotFound'}
+        '422': {$ref: '#/components/responses/CurriculumError'}
+        '500': {$ref: '#/components/responses/DatabaseError'}
+  /api/v1/coordinator/curriculum/template:
+    get:
+      operationId: curriculumTemplate
+      summary: Descargar plantilla XLSX; exclusivo para coordinadores
+      description: >-
+        Una hoja visible y ocho encabezados obligatorios: codigo, nombre, creditos,
+        ciclo, horas_teoria, horas_practica, horas_laboratorio, prerrequisitos.
+      responses:
+        '200': {$ref: '#/components/responses/XlsxDownload'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /api/v1/coordinator/curriculum/validate:
+    post:
+      operationId: validateCurriculum
+      summary: Validar XLSX sin persistir; exclusivo para coordinadores
+      description: >-
+        Valida filas, referencias independientes del orden, autorreferencias,
+        ciclos y protección histórica. Máximo 5000 filas de datos, 5 MiB de
+        archivo y 20 MiB descomprimidos. No admite fórmulas ni contenido activo.
+        Los errores de datos indican número físico de fila y nombre de columna.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {$ref: '#/components/schemas/CurriculumFile'}
+      responses:
+        '200':
+          description: Informe válido, SHA-256 del archivo y huella base del catálogo
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CurriculumReportResponse'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/CurriculumError'}
+        '500': {$ref: '#/components/responses/DatabaseError'}
+  /api/v1/coordinator/curriculum/import:
+    post:
+      operationId: importCurriculum
+      summary: Confirmar importación transaccional; exclusivo para coordinadores
+      description: >-
+        Enviar el mismo archivo y hashes obtenidos en validate. Se revalida bajo
+        bloqueo PostgreSQL antes de escribir. Idempotente por código y conjunto
+        de prerrequisitos; un reenvío ya aplicado es un no-op, aun con huella base
+        anterior. No elimina cursos omitidos ni cambia estados existentes.
+        El informe conserva la huella base de la operación, no la resultante.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, sha256, catalog_fingerprint]
+              properties:
+                file: {$ref: '#/components/schemas/CurriculumFile'}
+                sha256: {$ref: '#/components/schemas/Sha256'}
+                catalog_fingerprint: {$ref: '#/components/schemas/Sha256'}
+      responses:
+        '200':
+          description: Cursos y relaciones confirmados juntos, o reimportación sin cambios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CurriculumReportResponse'
+                  - type: object
+                    required: [message]
+                    properties:
+                      message: {type: string, const: Malla curricular importada correctamente.}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: Archivo distinto del validado o catálogo cambiado con modificaciones pendientes; volver a validar
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Message'}
+        '422': {$ref: '#/components/responses/CurriculumError'}
+        '500': {$ref: '#/components/responses/DatabaseError'}
+  /api/v1/coordinator/curriculum/export:
+    get:
+      operationId: exportCurriculum
+      summary: Exportar malla XLSX; exclusivo para coordinadores
+      description: >-
+        Todos los cursos, activos e inactivos, ordenados por código, en las ocho
+        columnas obligatorias. No incluye estado. Prerrequisitos separados por ;.
+        Códigos y nombres se exportan como texto literal, conservando ceros iniciales.
+      responses:
+        '200': {$ref: '#/components/responses/XlsxDownload'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/DatabaseError'}
+  "/api/v1/academic-periods":
+    get:
+      operationId: "listAcademicPeriods"
+      summary: "Consultar períodos con ventanas; usuario activo"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/AcademicPeriod"
+                  links:
+                    type: "object"
+                  meta:
+                    type: "object"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/academic-periods/{period}":
+    parameters:
+      -
+        name: "period"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "showAcademicPeriod"
+      summary: "Consultar un período por ID"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AcademicPeriod"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Período inexistente"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/academic-periods/{period}/windows":
+    parameters:
+      -
+        name: "period"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "listPreEnrollmentWindows"
+      summary: "Ventanas históricas del período; usuario activo"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PreEnrollmentWindow"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-periods":
+    post:
+      operationId: "createAcademicPeriod"
+      summary: "Crear período; coordinador"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/AcademicPeriodInput"
+              required: ["codigo","fecha_inicio","fecha_fin","estado"]
+      responses:
+        201:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AcademicPeriod"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-periods/{period}":
+    parameters:
+      -
+        name: "period"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    patch:
+      operationId: "updateAcademicPeriod"
+      summary: "Administrar período; coordinador"
+      description: "Código y fechas de clases son inmutables si hay historial o solicitudes. No escribe las fechas heredadas de prematrícula. Registra updated_by."
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/AcademicPeriodInput"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AcademicPeriod"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      operationId: "deleteAcademicPeriod"
+      summary: "Eliminar solo un período sin referencias; coordinador"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Message"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        409:
+          description: "El período tiene ventanas, historial o solicitudes"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-periods/{period}/windows":
+    parameters:
+      -
+        name: "period"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    post:
+      operationId: "createPreEnrollmentWindow"
+      summary: "Crear ordinaria o reapertura extraordinaria GLOBAL; coordinador"
+      description: "Intervalos [inicio, fin). Una ordinaria y posteriores extraordinarias sin solapamientos. No hay edición, borrado ni permisos individuales. Motivo y autor quedan registrados."
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/PreEnrollmentWindowInput"
+      responses:
+        201:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentWindow"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-periods/{period}/demand":
+    parameters:
+      -
+        name: "period"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "academicDemand"
+      summary: "Demanda por curso según validación académica; coordinador"
+      description: "Cuenta selecciones VALIDA del último envío registrado. Un borrador de corrección no reemplaza la revisión vigente hasta reenviarse; pendientes y ajustes se informan por separado."
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "object"
+                    properties:
+                      academic_period_id:
+                        type: "integer"
+                      cursos:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            course_id:
+                              type: "integer"
+                            codigo:
+                              type: "string"
+                            valida:
+                              type: "integer"
+                            pendiente_resultados:
+                              type: "integer"
+                            requiere_ajuste:
+                              type: "integer"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/academic-history":
+    get:
+      operationId: "ownAcademicHistory"
+      summary: "Historial propio, sin posibilidad de escritura"
+      description: "student_id no cambia al propietario autenticado."
+      parameters:
+        -
+          name: "academic_period_id"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/AcademicHistory"
+                  links:
+                    type: "object"
+                  meta:
+                    type: "object"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-history":
+    get:
+      operationId: "listAcademicHistory"
+      summary: "Consultar resultados oficiales; coordinador"
+      parameters:
+        -
+          name: "student_id"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+        -
+          name: "academic_period_id"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/AcademicHistory"
+                  links:
+                    type: "object"
+                  meta:
+                    type: "object"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-history/template":
+    get:
+      operationId: "academicHistoryTemplate"
+      summary: "Plantilla XLSX de resultados; coordinador"
+      responses:
+        200:
+          $ref: "#/components/responses/XlsxDownload"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-history/validate":
+    post:
+      operationId: "validateAcademicHistory"
+      summary: "Validación previa XLSX sin persistencia; coordinador"
+      description: "Columnas codigo_universitario, codigo_curso, codigo_periodo, nota_final, estado. No se infiere aprobación por nota. Errores con fila física y columna. Límites del lector XLSX del catálogo."
+      requestBody:
+        required: true
+        content:
+          "multipart/form-data":
+            schema:
+              type: "object"
+              required: ["file"]
+              properties:
+                file:
+                  $ref: "#/components/schemas/CurriculumFile"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AcademicHistoryReport"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/AcademicHistoryError"
+  "/api/v1/coordinator/academic-history/import":
+    post:
+      operationId: "importAcademicHistory"
+      summary: "Confirmación transaccional y auditada; coordinador"
+      description: "Mismo file, sha256 e history_fingerprint de validate. Motivo obligatorio. Actualiza por alumno/curso/período. Revalida solicitudes vigentes en la misma transacción sin modificar ENVIADA ni ventanas. Reenvíos ya aplicados no duplican resultados; cada confirmación conserva lote de auditoría."
+      requestBody:
+        required: true
+        content:
+          "multipart/form-data":
+            schema:
+              type: "object"
+              required: ["file","sha256","history_fingerprint","motivo"]
+              properties:
+                file:
+                  $ref: "#/components/schemas/CurriculumFile"
+                sha256:
+                  $ref: "#/components/schemas/Sha256"
+                history_fingerprint:
+                  $ref: "#/components/schemas/Sha256"
+                motivo:
+                  type: "string"
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AcademicHistoryReport"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        409:
+          description: "Archivo distinto o historial modificado; volver a validar"
+        422:
+          $ref: "#/components/responses/AcademicHistoryError"
+        500:
+          $ref: "#/components/responses/DatabaseError"
+  "/api/v1/coordinator/academic-history/imports":
+    get:
+      operationId: "listAcademicHistoryImports"
+      summary: "Lotes de auditoría; coordinador"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/AcademicHistoryImport"
+                  links:
+                    type: "object"
+                  meta:
+                    type: "object"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/academic-history/imports/{import}":
+    parameters:
+      -
+        name: "import"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "showAcademicHistoryImport"
+      summary: "Auditoría con cambios de nota/estado antes y después; coordinador"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AcademicHistoryImport"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Lote inexistente"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollments/{preEnrollment}/corrections":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    post:
+      operationId: "startExtraordinaryCorrection"
+      summary: "Corregir solicitud propia durante una extraordinaria global"
+      description: "Cualquier titular ENVIADA puede corregir durante una EXTRAORDINARIA activa. La solicitud actual pasa a BORRADOR y conserva su revisión enviada vigente. No duplica revisiones ni concede reapertura individual. El reenvío exitoso crea nueva revisión, fecha y PDF."
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Solicitud inexistente o de otro estudiante"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollment/available-courses":
+    get:
+      operationId: "availableStudentCourses"
+      summary: "Elegibilidad académica sin límite por número de ciclo"
+      description: "APROBADO satisface prerrequisitos; EN_CURSO provisionalmente. DESAPROBADO/RETIRADO no. No ofrece cursos ya aprobados/en curso."
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    type: "object"
+                    properties:
+                      periodo:
+                        type: "object"
+                      creditos_maximos:
+                        type: "integer"
+                      cursos:
+                        type: "array"
+                        items:
+                          $ref: "#/components/schemas/Course"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollment":
+    get:
+      operationId: "currentPreEnrollment"
+      summary: "Consultar solicitud actual o por período propio"
+      description: "Compatibilidad: puede crear borrador si no existe y hay ventana activa. Fuera de ventana consulta la última solicitud propia. Nunca crea fuera de fechas."
+      parameters:
+        -
+          name: "academic_period_id"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        201:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+    post:
+      operationId: "createPreEnrollmentDraft"
+      summary: "Crear/obtener una única solicitud lógica del período abierto"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        201:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollments":
+    get:
+      operationId: "ownPreEnrollments"
+      summary: "Historial propio de solicitudes y revisiones vigentes"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollments/{preEnrollment}":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "showOwnPreEnrollment"
+      summary: "Consultar solicitud propia, incluso con ventana cerrada"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollment/courses":
+    post:
+      operationId: "addPreEnrollmentCourse"
+      summary: "Agregar curso elegible sin duplicados ni exceso de créditos"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              required: ["course_id"]
+              properties:
+                course_id:
+                  type: "integer"
+                  minimum: 1
+                preferencia_turno:
+                  type: "string"
+                  enum: ["MANANA","TARDE","SIN_PREFERENCIA"]
+      responses:
+        201:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  message:
+                    type: "string"
+                  data:
+                    type: "object"
+                    properties:
+                      detail_id:
+                        type: "integer"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollment/courses/{detail}":
+    parameters:
+      -
+        name: "detail"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    delete:
+      operationId: "removePreEnrollmentCourse"
+      summary: "Quitar curso del borrador propio durante ventana activa"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Message"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollment/courses/{detail}/preference":
+    parameters:
+      -
+        name: "detail"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    patch:
+      operationId: "updatePreEnrollmentPreference"
+      summary: "Modificar preferencia del borrador propio durante ventana"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              required: ["preferencia_turno"]
+              properties:
+                preferencia_turno:
+                  type: "string"
+                  enum: ["MANANA","TARDE","SIN_PREFERENCIA"]
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollment/submit":
+    post:
+      operationId: "submitStudentPreEnrollment"
+      summary: "Registrar envío/reenvío, revisión inmutable y PDF; sin aprobación"
+      description: "Revalida toda la selección y ventana dentro de una transacción. EN_CURSO permite registro provisional. Cada envío exitoso tiene número, fecha, ventana y constancia únicos. Si falla no reemplaza la última revisión, no consume número y conserva borrador."
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollments/{preEnrollment}/revisions":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "studentPreEnrollmentRevisions"
+      summary: "Historial inmutable de envíos; propietario o coordinador autorizado"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PreEnrollmentRevision"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollments/{preEnrollment}/receipt":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "studentCurrentPreEnrollmentReceipt"
+      summary: "PDF A4 de la revisión vigente, sin reconstruir relaciones actuales"
+      responses:
+        200:
+          $ref: "#/components/responses/PreEnrollmentPdf"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        409:
+          description: "Revisión sin PDF histórico disponible o digest inválido"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/student/pre-enrollments/{preEnrollment}/revisions/{revision}/receipt":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+      -
+        name: "revision"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "studentHistoricalPreEnrollmentReceipt"
+      summary: "PDF histórico original; revisión debe pertenecer a la solicitud"
+      responses:
+        200:
+          $ref: "#/components/responses/PreEnrollmentPdf"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        409:
+          description: "No se inventa PDF para snapshots heredados incompletos"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/pre-enrollments/{preEnrollment}/revisions":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "coordinatorPreEnrollmentRevisions"
+      summary: "Historial inmutable de envíos; propietario o coordinador autorizado"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PreEnrollmentRevision"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/pre-enrollments/{preEnrollment}/receipt":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "coordinatorCurrentPreEnrollmentReceipt"
+      summary: "PDF A4 de la revisión vigente, sin reconstruir relaciones actuales"
+      responses:
+        200:
+          $ref: "#/components/responses/PreEnrollmentPdf"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        409:
+          description: "Revisión sin PDF histórico disponible o digest inválido"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/pre-enrollments/{preEnrollment}/revisions/{revision}/receipt":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+      -
+        name: "revision"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "coordinatorHistoricalPreEnrollmentReceipt"
+      summary: "PDF histórico original; revisión debe pertenecer a la solicitud"
+      responses:
+        200:
+          $ref: "#/components/responses/PreEnrollmentPdf"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        409:
+          description: "No se inventa PDF para snapshots heredados incompletos"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/pre-enrollments":
+    get:
+      operationId: "listRegisteredPreEnrollments"
+      summary: "Consultar registros, no una bandeja de aprobación"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+  "/api/v1/coordinator/pre-enrollments/{preEnrollment}":
+    parameters:
+      -
+        name: "preEnrollment"
+        in: "path"
+        required: true
+        schema:
+          type: "integer"
+          minimum: 1
+    get:
+      operationId: "showRegisteredPreEnrollment"
+      summary: "Consultar registros, no una bandeja de aprobación"
+      responses:
+        200:
+          description: "Respuesta correcta"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PreEnrollmentProcessFields"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: "Recurso inexistente o ajeno"
+        422:
+          $ref: "#/components/responses/ValidationError"
+components:
+  parameters:
+    CourseId:
+      name: course
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+  schemas:
+    PreEnrollmentRevision:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        revision_number:
+          type: ["integer","null"]
+        window_id:
+          type: ["integer","null"]
+        submitted_at:
+          type: ["string","null"]
+          format: "date-time"
+        receipt_code:
+          type: ["string","null"]
+        receipt_available:
+          type: "boolean"
+        pdf_sha256:
+          type: ["string","null"]
+        schema_version:
+          type: "integer"
+        motivo:
+          type: "string"
+        snapshot:
+          type: "object"
+          description: "Datos históricos inmutables: institución, estudiante, período, cursos completos, créditos, preferencias, fecha y ventana. Schema 1 puede estar incompleto; no se fabrica PDF."
+    AcademicPeriodInput:
+      type: "object"
+      properties:
+        codigo:
+          type: "string"
+          maxLength: 20
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        fecha_inicio:
+          type: "string"
+          format: "date"
+        fecha_fin:
+          type: "string"
+          format: "date"
+        estado:
+          type: "string"
+          enum: ["PLANIFICACION","PREMATRICULA","EN_CURSO","CERRADO"]
+      description: "No aceptar autor ni fechas heredadas; las fechas de clases son independientes de ventanas."
+    AcademicPeriod:
+      type: "object"
+      required: ["id","codigo","estado","fecha_inicio","fecha_fin","created_by","updated_by","ventanas"]
+      properties:
+        id:
+          type: "integer"
+        codigo:
+          type: "string"
+        estado:
+          type: "string"
+        fecha_inicio:
+          type: "string"
+          format: "date"
+        fecha_fin:
+          type: "string"
+          format: "date"
+        timezone:
+          type: "string"
+        created_by:
+          type: ["integer","null"]
+        updated_by:
+          type: ["integer","null"]
+        created_at:
+          type: "string"
+          format: "date-time"
+        updated_at:
+          type: "string"
+          format: "date-time"
+        ventanas:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/PreEnrollmentWindow"
+    PreEnrollmentWindowInput:
+      type: "object"
+      required: ["tipo","fecha_inicio","fecha_fin","motivo"]
+      properties:
+        tipo:
+          type: "string"
+          enum: ["ORDINARIA","EXTRAORDINARIA"]
+        fecha_inicio:
+          type: "string"
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$"
+        fecha_fin:
+          type: "string"
+          pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$"
+        motivo:
+          type: "string"
+          minLength: 1
+          maxLength: 2000
+      description: "Fechas locales en ACADEMIC_TIMEZONE, por defecto America/Lima. No recibir student_id, user_id ni created_by."
+    PreEnrollmentWindow:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        academic_period_id:
+          type: "integer"
+        tipo:
+          type: "string"
+          enum: ["ORDINARIA","EXTRAORDINARIA"]
+        fecha_inicio:
+          type: "string"
+          format: "date-time"
+        fecha_fin:
+          type: "string"
+          format: "date-time"
+        timezone:
+          type: "string"
+        motivo:
+          type: "string"
+        created_by:
+          type: ["integer","null"]
+        origen:
+          type: "string"
+          enum: ["API","MIGRACION"]
+        created_at:
+          type: "string"
+          format: "date-time"
+        updated_at:
+          type: "string"
+          format: "date-time"
+    AcademicHistory:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        student_id:
+          type: "integer"
+        codigo_universitario:
+          type: "string"
+        curso:
+          type: "object"
+          properties:
+            id:
+              type: "integer"
+            codigo:
+              type: "string"
+            nombre:
+              type: "string"
+        periodo:
+          type: "object"
+          properties:
+            id:
+              type: "integer"
+            codigo:
+              type: "string"
+        nota_final:
+          type: ["string","null"]
+          description: "Decimal de dos posiciones. Sin nota mínima aprobatoria; estado oficial manda."
+        estado:
+          type: "string"
+          enum: ["APROBADO","DESAPROBADO","RETIRADO","EN_CURSO"]
+        created_at:
+          type: "string"
+          format: "date-time"
+        updated_at:
+          type: "string"
+          format: "date-time"
+    AcademicHistoryReport:
+      type: "object"
+      required: ["valid","history_fingerprint","summary","changes","errors"]
+      properties:
+        valid:
+          type: "boolean"
+        history_fingerprint:
+          $ref: "#/components/schemas/Sha256"
+          description: "Huella base de los resultados y referencias afectados."
+        sha256:
+          $ref: "#/components/schemas/Sha256"
+        import_id:
+          type: "integer"
+        summary:
+          type: "object"
+          properties:
+            created:
+              type: "integer"
+            updated:
+              type: "integer"
+            unchanged:
+              type: "integer"
+        changes:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              row:
+                type: "integer"
+              codigo_universitario:
+                type: "string"
+              codigo_curso:
+                type: "string"
+              codigo_periodo:
+                type: "string"
+              action:
+                type: "string"
+                enum: ["create","update","unchanged"]
+              before:
+                type: ["object","null"]
+              after:
+                type: "object"
+        errors:
+          type: "array"
+          items:
+            type: "object"
+            required: ["row","column","message"]
+            properties:
+              row:
+                type: "integer"
+                minimum: 1
+              column:
+                type: "string"
+              message:
+                type: "string"
+    AcademicHistoryImport:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        created_by:
+          type: "integer"
+        sha256:
+          $ref: "#/components/schemas/Sha256"
+        motivo:
+          type: "string"
+        summary:
+          type: "object"
+        created_at:
+          type: "string"
+          format: "date-time"
+        changes:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              id:
+                type: "integer"
+              academic_history_id:
+                type: "integer"
+              before:
+                type: ["object","null"]
+              after:
+                type: "object"
+              created_at:
+                type: "string"
+                format: "date-time"
+    AcademicValidation:
+      type: ["object","null"]
+      properties:
+        estado:
+          type: "string"
+          enum: ["PENDIENTE_RESULTADOS","VALIDA","REQUIERE_AJUSTE"]
+        evaluated_at:
+          type: "string"
+          format: "date-time"
+        cursos:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              course_id:
+                type: "integer"
+              codigo:
+                type: "string"
+              estado:
+                type: "string"
+                enum: ["PENDIENTE_RESULTADOS","VALIDA","REQUIERE_AJUSTE"]
+              motivo:
+                type: ["string","null"]
+              prerrequisitos:
+                type: "array"
+                items:
+                  type: "object"
+                  properties:
+                    id:
+                      type: "integer"
+                    codigo:
+                      type: "string"
+                    estado_historial:
+                      type: ["string","null"]
+                      enum: ["APROBADO","DESAPROBADO","RETIRADO","EN_CURSO",null]
+                    estado_validacion:
+                      type: "string"
+    PreEnrollmentProcessFields:
+      type: "object"
+      description: "Campos del recurso de prematrícula existente; conserva los demás datos públicos."
+      properties:
+        id:
+          type: "integer"
+        estado:
+          type: "string"
+          enum: [BORRADOR, ENVIADA, APROBADA, RECHAZADA]
+          description: Los dos últimos estados son exclusivamente históricos; ENVIADA es registro exitoso.
+        fecha_envio:
+          type: [string, 'null']
+          format: "date-time"
+        correccion_en_progreso:
+          type: "boolean"
+        current_revision_id:
+          type: [integer, 'null']
+        revision_vigente:
+          oneOf:
+            - $ref: '#/components/schemas/PreEnrollmentRevision'
+            - type: 'null'
+        validacion_academica:
+          $ref: "#/components/schemas/AcademicValidation"
+    Sha256:
+      type: string
+      pattern: '^[a-f0-9]{64}$'
+      minLength: 64
+      maxLength: 64
+    CurriculumFile:
+      type: string
+      format: binary
+      description: Archivo .xlsx, máximo 5120 KiB; una sola hoja visible.
+    WeeklyHours:
+      type: string
+      pattern: '^[0-9]{1,3}\.[0-9]{2}$'
+      description: Horas académicas semanales decimal(5,2), no totales del semestre; rango 0 a 999.99.
+      examples: ['0.00', '2.50']
+    WeeklyHoursInput:
+      oneOf:
+        - type: number
+          minimum: 0
+          maximum: 999.99
+          multipleOf: 0.01
+        - type: string
+          pattern: '^[0-9]{1,3}(\.[0-9]{1,2})?$'
+      description: Número o texto decimal; máximo dos posiciones decimales.
+    Course:
+      type: object
+      required: [id, codigo, nombre, creditos, ciclo, horas_teoria, horas_practica, horas_laboratorio, estado, prerrequisitos]
+      properties:
+        id: {type: integer}
+        codigo: {type: string, maxLength: 30, examples: ['00101']}
+        nombre: {type: string, maxLength: 150}
+        creditos: {type: integer, minimum: 1, maximum: 32767}
+        ciclo: {type: integer, minimum: 1, maximum: 32767}
+        horas_teoria: {$ref: '#/components/schemas/WeeklyHours'}
+        horas_practica: {$ref: '#/components/schemas/WeeklyHours'}
+        horas_laboratorio: {$ref: '#/components/schemas/WeeklyHours'}
+        estado: {type: string, enum: [ACTIVO, INACTIVO]}
+        prerrequisitos:
+          type: array
+          items:
+            type: object
+            required: [id, codigo, nombre]
+            properties:
+              id: {type: integer}
+              codigo: {type: string}
+              nombre: {type: string}
+    CourseUpdate:
+      type: object
+      properties:
+        nombre: {type: string, minLength: 1, maxLength: 150}
+        creditos: {type: integer, minimum: 1, maximum: 32767}
+        ciclo: {type: integer, minimum: 1, maximum: 32767}
+        horas_teoria: {$ref: '#/components/schemas/WeeklyHoursInput'}
+        horas_practica: {$ref: '#/components/schemas/WeeklyHoursInput'}
+        horas_laboratorio: {$ref: '#/components/schemas/WeeklyHoursInput'}
+        estado: {type: string, enum: [ACTIVO, INACTIVO]}
+        prerrequisitos:
+          type: array
+          maxItems: 5000
+          uniqueItems: true
+          items:
+            type: string
+            maxLength: 30
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
+      not:
+        required: [codigo]
+    CurriculumReportResponse:
+      type: object
+      required: [data]
+      properties:
+        data: {$ref: '#/components/schemas/CurriculumReport'}
+    CurriculumReport:
+      type: object
+      required: [valid, catalog_fingerprint, summary, changes, errors]
+      properties:
+        valid: {type: boolean}
+        catalog_fingerprint:
+          allOf:
+            - $ref: '#/components/schemas/Sha256'
+          description: Huella del catálogo base, incluyendo prerrequisitos, estado y uso académico.
+        sha256:
+          allOf:
+            - $ref: '#/components/schemas/Sha256'
+          description: Archivo recibido; presente en validación y confirmación exitosa.
+        summary:
+          type: object
+          required: [created, updated, unchanged]
+          properties:
+            created: {type: integer, minimum: 0}
+            updated: {type: integer, minimum: 0}
+            unchanged: {type: integer, minimum: 0}
+        changes:
+          type: array
+          items:
+            type: object
+            required: [row, codigo, action, fields, protected]
+            properties:
+              row: {type: integer, minimum: 0}
+              codigo: {type: string}
+              action: {type: string, enum: [create, update, unchanged]}
+              fields:
+                type: array
+                items: {type: string}
+              protected: {type: boolean}
+        errors:
+          type: array
+          items:
+            type: object
+            required: [row, column, message]
+            properties:
+              row:
+                type: integer
+                minimum: 0
+                description: Fila física Excel; 1 para error global del grafo, 0 para PATCH sin Excel.
+              column: {type: string}
+              message: {type: string}
+    LoginRequest:
+      type: object
+      required: [identifier, password]
+      not:
+        required: [correo_institucional]
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Correo institucional o código universitario como texto.
+        password:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          format: password
+          writeOnly: true
+    LegacyLoginRequest:
+      type: object
+      required: [correo_institucional, password]
+      not:
+        required: [identifier]
+      properties:
+        correo_institucional:
+          type: string
+          format: email
+          maxLength: 255
+          deprecated: true
+        password:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          format: password
+          writeOnly: true
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, correo_institucional, rol, estado, cargo]
+      properties:
+        id:
+          type: integer
+        correo_institucional:
+          type: string
+          format: email
+        rol:
+          type: string
+          enum: [ESTUDIANTE, COORDINADOR]
+        estado:
+          type: string
+          enum: [ACTIVO, INACTIVO]
+        cargo:
+          type: [string, 'null']
+          enum: [DIRECTOR_ESCUELA, SECRETARIA, null]
+          description: Nulo para estudiantes y coordinadores anteriores sin cargo confirmado.
+    Message:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+  responses:
+    PreEnrollmentPdf:
+      description: "Una página A4; bytes originales verificados por SHA-256, snapshot completo del envío. No constituye matrícula definitiva."
+      headers:
+        "Content-Disposition":
+          schema:
+            type: "string"
+        "Cache-Control":
+          schema:
+            type: "string"
+            const: "private, no-store"
+      content:
+        "application/pdf":
+          schema:
+            type: "string"
+            format: "binary"
+    AcademicHistoryError:
+      description: "Errores de datos por fila/columna o validación de carga/campos."
+      content:
+        "application/json":
+          schema:
+            oneOf:
+              -
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AcademicHistoryReport"
+              -
+                type: "object"
+                required: ["message","errors"]
+                properties:
+                  message:
+                    type: "string"
+                  errors:
+                    type: "object"
+    CourseResponse:
+      description: Curso con horas semanales y prerrequisitos
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: {$ref: '#/components/schemas/Course'}
+    CourseNotFound:
+      description: Curso inexistente o inactivo consultado por un estudiante
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Message'}
+    Forbidden:
+      description: Rol o política no autorizados, o cuenta desactivada
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Message'}
+    CurriculumError:
+      description: >-
+        Error de datos, grafo o protección con informe localizado por fila/columna;
+        errores de carga, contenedor, encabezados o campos JSON usan message/errors.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/CurriculumReportResponse'
+              - type: object
+                required: [message, errors]
+                properties:
+                  message: {type: string}
+                  errors:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items: {type: string}
+    XlsxDownload:
+      description: Hoja Excel con ocho encabezados; descarga privada, no-store
+      headers:
+        Content-Disposition:
+          schema: {type: string}
+          description: attachment con nombre de archivo .xlsx
+        Cache-Control:
+          schema: {type: string, const: 'private, no-store'}
+      content:
+        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+          schema: {type: string, format: binary}
+    Unauthenticated:
+      description: Token ausente, inválido, revocado o vencido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Message'
+          example: {message: Unauthenticated.}
+    DisabledAccount:
+      description: Cuenta desactivada o estudiante sin perfil activo; se revocan sus tokens
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Message'
+          example: {message: Acceso no autorizado.}
+    ValidationError:
+      description: Datos inválidos; en login incluye ambos campos de identificación presentes
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message, errors]
+            properties:
+              message:
+                type: string
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: {type: string}
+    DatabaseError:
+      description: Error de persistencia sin detalles sensibles
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Message'
+          example: {message: No se pudo completar la operación.}

@@ -11,8 +11,6 @@ Esta guía proporciona la referencia de tipos y valores permitidos para facilita
 export enum UserRole {
   ESTUDIANTE = 'ESTUDIANTE',
   COORDINADOR = 'COORDINADOR',
-  DOCENTE = 'DOCENTE',
-  ADMINISTRADOR = 'ADMINISTRADOR',
 }
 ```
 
@@ -20,9 +18,9 @@ export enum UserRole {
 ```typescript
 export enum PreEnrollmentStatus {
   BORRADOR = 'BORRADOR',    // En edición por el estudiante
-  ENVIADA = 'ENVIADA',      // Enviada por el estudiante, pendiente de revisión
-  APROBADA = 'APROBADA',    // Aprobada por el coordinador
-  RECHAZADA = 'RECHAZADA',  // Rechazada por el coordinador
+  ENVIADA = 'ENVIADA',      // Registro exitoso; no requiere aprobación
+  APROBADA = 'APROBADA',    // Solo lectura de historial anterior
+  RECHAZADA = 'RECHAZADA',  // Solo lectura de historial anterior
 }
 ```
 
@@ -31,7 +29,6 @@ export enum PreEnrollmentStatus {
 export enum SchedulePreference {
   MANANA = 'MANANA',
   TARDE = 'TARDE',
-  NOCHE = 'NOCHE',
   SIN_PREFERENCIA = 'SIN_PREFERENCIA',
 }
 ```
@@ -41,9 +38,8 @@ export enum SchedulePreference {
 export enum AcademicPeriodStatus {
   PLANIFICACION = 'PLANIFICACION',
   PREMATRICULA = 'PREMATRICULA',
-  MATRICULA = 'MATRICULA',
   EN_CURSO = 'EN_CURSO',
-  FINALIZADO = 'FINALIZADO',
+  CERRADO = 'CERRADO',
 }
 ```
 
@@ -61,6 +57,7 @@ export enum AcademicHistoryStatus {
   APROBADO = 'APROBADO',
   DESAPROBADO = 'DESAPROBADO',
   EN_CURSO = 'EN_CURSO',
+  RETIRADO = 'RETIRADO',
 }
 ```
 
@@ -77,13 +74,15 @@ export interface AuthUser {
   id: number;
   correo_institucional: string;
   rol: UserRole;
-  estado?: RecordStatus;
+  estado: RecordStatus;
+  cargo: 'DIRECTOR_ESCUELA' | 'SECRETARIA' | null;
 }
 
 export interface LoginResponse {
   message: string;
   data: {
     token: string;
+    expires_at: string;
     user: AuthUser;
   };
 }
@@ -111,6 +110,10 @@ export interface Course {
   nombre: string;
   creditos: number;
   ciclo: number;
+  horas_teoria: string;       // Decimal con dos posiciones; horas académicas semanales
+  horas_practica: string;
+  horas_laboratorio: string;
+  estado: RecordStatus;
   prerrequisitos?: CoursePrerequisite[];
 }
 
@@ -145,6 +148,34 @@ export interface PreEnrollmentDetail {
 export interface PreEnrollment {
   id: number;
   estado: PreEnrollmentStatus;
+  correccion_en_progreso: boolean;
+  current_revision_id: number | null;
+  revision_vigente?: {
+    id: number;
+    revision_number: number | null;
+    window_id: number | null;
+    submitted_at: string | null;
+    receipt_code: string | null;
+    receipt_available: boolean;
+    schema_version: number;
+    snapshot: Record<string, unknown>;
+  } | null;
+  validacion_academica?: {
+    estado: 'PENDIENTE_RESULTADOS' | 'VALIDA' | 'REQUIERE_AJUSTE';
+    evaluated_at: string;
+    cursos: Array<{
+      course_id: number;
+      codigo: string;
+      estado: 'PENDIENTE_RESULTADOS' | 'VALIDA' | 'REQUIERE_AJUSTE';
+      motivo: string | null;
+      prerrequisitos: Array<{
+        id: number;
+        codigo: string;
+        estado_historial: AcademicHistoryStatus | null;
+        estado_validacion: 'PENDIENTE_RESULTADOS' | 'VALIDA' | 'REQUIERE_AJUSTE';
+      }>;
+    }>;
+  } | null;
   fecha_envio: string | null;     // ISO 8601 string
   fecha_revision: string | null;  // ISO 8601 string
   comentarios_coordinador: string | null;

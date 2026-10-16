@@ -2,76 +2,30 @@
 
 namespace App\UseCases\PreEnrollment;
 
-use App\Enums\AcademicHistoryStatus;
+use App\Enums\AcademicValidationStatus;
 use App\Enums\RecordStatus;
+use App\Models\AcademicPeriod;
 use App\Models\Course;
 use App\Models\Student;
+use App\Services\AcademicEligibility;
 use Illuminate\Support\Collection;
 
 class GetAvailableCourses
 {
-    public function __invoke(Student $student): Collection
+    public function __construct(private readonly AcademicEligibility $eligibility) {}
+
+    public function __invoke(Student $student, ?AcademicPeriod $period = null): Collection
     {
-        $histories = $student->academicHistories()->get();
+        $histories = $this->eligibility->histories($student, $period);
 
-        $excludedCourseIds = $histories
-            ->filter(fn ($history) => in_array(
-                $history->estado,
-                [
-                    AcademicHistoryStatus::APROBADO,
-                    AcademicHistoryStatus::EN_CURSO,
-                ],
-                true
-            )
-            )
-            ->pluck('course_id');
-
-        $courses = Course::query()
-            ->where('estado', RecordStatus::ACTIVO)
-            ->whereNotIn('id', $excludedCourseIds)
-            ->with('prerequisites')
-            ->orderBy('ciclo')
-            ->orderBy('nombre')
-            ->get();
-
-        return $courses->filter(
-            function (Course $course) use ($histories) {
-                return $this->meetsPrerequisites(
-                    $course,
-                    $histories
-                );
-            }
-        )->values();
+        return Course::query()->where('estado', RecordStatus::ACTIVO)->with('prerequisites')
+            ->orderBy('ciclo')->orderBy('nombre')->get()->filter(
+                fn (Course $course): bool => $this->eligibility->evaluate($course, $histories)['estado'] !== AcademicValidationStatus::REQUIERE_AJUSTE->value
+            )->values();
     }
 
-    private function meetsPrerequisites(
-        Course $course,
-        Collection $histories
-    ): bool {
-        if ($course->prerequisites->isEmpty()) {
-            return true;
-        }
-
-        return $course->prerequisites->every(
-            function (Course $prerequisite) use ($histories) {
-                return $histories->contains(
-                    function ($history) use ($prerequisite) {
-                        return $history->course_id === $prerequisite->id && in_array($history->estado, [
-                            AcademicHistoryStatus::APROBADO,
-                            AcademicHistoryStatus::EN_CURSO,
-                        ], true);
-                    }
-                );
-            }
-
-        );
-    }
-
-    public function isAvailable(
-        Student $student,
-        Course $course
-    ): bool {
-        return $this->__invoke($student)
-            ->contains('id', $course->id);
+    public function isAvailable(Student $student, Course $course, ?AcademicPeriod $period = null): bool
+    {
+        return $this->__invoke($student, $period)->contains('id', $course->id);
     }
 }
