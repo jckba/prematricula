@@ -62,8 +62,9 @@ export async function api(path, { method = 'GET', body } = {}) {
     return data;
 }
 
-export async function login(correo_institucional, password) {
-    const res = await api('/login', { method: 'POST', body: { correo_institucional, password } });
+// identifier: correo institucional o código universitario (string).
+export async function login(identifier, password) {
+    const res = await api('/login', { method: 'POST', body: { identifier, password } });
     auth.save(res.data.token, res.data.user);
     return res.data.user;
 }
