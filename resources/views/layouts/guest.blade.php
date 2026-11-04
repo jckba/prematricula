@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title', 'Prematrícula')</title>
+    <meta name="referrer" content="same-origin">
+    <title>@yield('title', 'Prematrícula') · UNT Informática</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-slate-100 text-slate-800 antialiased">
-    <main class="min-h-screen flex items-center justify-center p-4">
-        <div class="w-full max-w-md">@yield('content')</div>
-    </main>
+<body class="guest-body">
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <main id="main" class="login-layout">@yield('content')</main>
 </body>
 </html>
