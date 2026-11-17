@@ -1,7 +1,23 @@
 
+# Etapa 1: Compilar recursos frontend
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm ci
+
+COPY resources/ ./resources/
+COPY vite.config.* ./
+COPY public/ ./public/
+
+RUN npm run build
+
+
+# Etapa 2: Aplicación Laravel
 FROM php:8.4-apache
 
-# Dependencias del sistema y extensiones PHP
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     libxml2-dev \
@@ -18,22 +34,23 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copiar el proyecto
 COPY . .
 
-# Instalar dependencias de producción
+# Copiar recursos frontend compilados
+COPY --from=frontend /app/public/build ./public/build
+
+# Instalar dependencias PHP
 RUN composer install \
     --no-dev \
     --prefer-dist \
     --no-interaction \
     --optimize-autoloader
 
-# Configurar Apache para servir desde public/
+# Configurar Apache
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
 RUN sed -ri \
@@ -48,5 +65,5 @@ RUN sed -ri \
     && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# Configurar puerto de Render
+# Puerto de Render
 CMD ["bash", "-c", "sed -i \"s/Listen 80/Listen ${PORT:-10000}/\" /etc/apache2/ports.conf && sed -i \"s/*:80/*:${PORT:-10000}/\" /etc/apache2/sites-available/000-default.conf && exec apache2-foreground"]
