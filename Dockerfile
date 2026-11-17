@@ -1,16 +1,19 @@
 
 FROM php:8.4-apache
 
-# Dependencias del sistema y extensiones PHP necesarias
+# Dependencias del sistema y extensiones PHP
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     libxml2-dev \
     libonig-dev \
+    libzip-dev \
+    unzip \
     && docker-php-ext-install \
         pdo_pgsql \
         mbstring \
         dom \
         simplexml \
+        zip \
     && a2enmod rewrite headers \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -41,5 +44,5 @@ RUN sed -ri \
     /etc/apache2/apache2.conf \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# Render proporciona el puerto mediante PORT
+# Configurar puerto de Render
 CMD ["bash", "-c", "sed -i \"s/Listen 80/Listen ${PORT:-10000}/\" /etc/apache2/ports.conf && sed -i \"s/*:80/*:${PORT:-10000}/\" /etc/apache2/sites-available/000-default.conf && exec apache2-foreground"]
