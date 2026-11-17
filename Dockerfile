@@ -42,6 +42,10 @@ RUN sed -ri \
     && sed -ri \
     -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' \
     /etc/apache2/apache2.conf \
+    && sed -ri \
+    -e 's/AllowOverride None/AllowOverride All/g' \
+    /etc/apache2/apache2.conf \
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # Configurar puerto de Render
