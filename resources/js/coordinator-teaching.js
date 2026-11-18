@@ -89,47 +89,54 @@ export async function demand(ctx) {
     const periods = await allOptions(ctx, '/academic-periods', row => row.codigo);
     if (!ctx.current()) return;
     if (!periods.length) { shell(ctx, 'Demanda académica', 'Primero registre un período académico.'); return; }
-    const fields = [periodFilter(periods, true), text('q', 'Código o nombre de curso', { minlength: 2 }), number('ciclo', 'Ciclo'),
-        select('estado_validacion', 'Validación académica', ['VALIDA', 'PENDIENTE_RESULTADOS', 'REQUIERE_AJUSTE', 'SIN_VALIDACION']),
-        select('preferencia_turno', 'Preferencia', ['MANANA', 'TARDE', 'SIN_PREFERENCIA']),
-        select('sort', 'Ordenar por', ['course_id', 'codigo', 'nombre', 'ciclo', 'creditos', 'registrada', 'valida', 'pendiente_resultados', 'requiere_ajuste']),
-        select('direction', 'Dirección', ['asc', 'desc'])];
-    let query = { academic_period_id: String(periods[0][0]) }, page = 1, ticket = 0;
-    shell(ctx, 'Demanda académica estimada', 'Las preferencias declaradas no son horarios ni grupos. Las cifras no constituyen matrícula definitiva.',
-        filterForm(fields, query, button('Exportar CSV', 'export')));
-    const columns = [['Código', 'codigo'], ['Curso', 'nombre'], ['Ciclo', 'ciclo'], ['Créditos', 'creditos'], ['Registrada', 'registrada'], ['Válida', 'valida'], ['Pendiente', 'pendiente_resultados'], ['Requiere ajuste', 'requiere_ajuste'], ['Sin validación', 'sin_validacion'], ['Mañana', 'manana'], ['Tarde', 'tarde'], ['Sin preferencia', 'sin_preferencia']];
+    let query = { academic_period_id: String(periods[0][0]) }, ticket = 0;
+    shell(ctx, 'Demanda académica', 'Monitorea la matrícula y demanda por ciclo y curso.',
+        filterForm([periodFilter(periods, true)], query, button('Exportar CSV', 'export')));
     const load = async () => {
         const sequence = ++ticket;
-        const { academic_period_id: period, ...filters } = query;
+        const { academic_period_id: period } = query;
         if (!period) throw new Error('Seleccione un período académico.');
-        const [response, summary] = await Promise.all([
-            ctx.request('/coordinator/academic-periods/' + period + '/demand', { query: { ...filters, page } }),
-            ctx.request('/coordinator/academic-periods/' + period + '/summary', { query: filters }),
-        ]);
+        const summary = await ctx.request('/coordinator/academic-periods/' + period + '/summary');
         if (!ctx.current() || sequence !== ticket) return;
-        ctx.root.querySelector('[data-content]').innerHTML = '<div class="notice">' + esc(response.data.advertencia) + '</div>' +
-            statCards([['Estudiantes que enviaron', summary.data.alumnos_enviaron], ['Estudiantes con ajuste', summary.data.alumnos_requieren_ajuste], ['Sin validación', summary.data.alumnos_sin_validacion], ['Población académica', summary.data.poblacion_academica], ['No enviaron', summary.data.alumnos_no_enviaron]]) +
-            '<p class="muted">' + esc(summary.data.fuente_poblacion) + '</p><h2>Demanda por curso</h2>' +
-            table(columns, response.data.cursos, row => button('Interesados', 'interested', row.course_id)) + pagination(response.data.paginacion) +
-            '<h2>Resumen por ciclo</h2>' + table([['Ciclo', 'ciclo'], ['Estudiantes que enviaron', 'alumnos_enviaron'], ['Selecciones registradas', 'registrada'], ['Selecciones válidas', 'valida'], ['Pendientes', 'pendiente_resultados'], ['Con ajuste', 'requiere_ajuste']], summary.data.ciclos) +
-            '<p class="muted">Un estudiante puede aparecer en varios ciclos; no sume esos conteos para obtener alumnos únicos.</p>';
+        const cycles = summary.data.ciclos || [];
+        const total = cycles.reduce((sum, row) => sum + Number(row.registrada || 0), 0);
+        const avg = cycles.length ? Math.round(total / cycles.length) : 0;
+        const peak = Math.max(0, ...cycles.map(row => Number(row.registrada || 0)));
+        const chart = '<div class="demand-chart" role="img" aria-label="Alumnos matriculados por ciclo">' + cycles.map(row => {
+            const count = Number(row.registrada || 0), height = peak ? Math.max(4, count / peak * 100) : 0;
+            return '<div class="demand-bar-column"><strong>' + count.toLocaleString('es-PE') + '</strong><div class="demand-bar-track"><span class="demand-bar" style="height:' + height + '%"></span></div><small>Ciclo ' + esc(row.ciclo) + '</small></div>';
+        }).join('') + '</div>';
+        const sections = await Promise.all(cycles.map(async row => {
+            const courses = await ctx.request('/coordinator/academic-periods/' + period + '/demand', { query: { ciclo: row.ciclo, per_page: 100 } });
+            const items = courses.data.cursos || [];
+            const html = '<details class="demand-cycle"><summary>Ciclo ' + esc(row.ciclo) + '<span>' + Number(row.registrada || 0).toLocaleString('es-PE') + ' selecciones</span></summary><div class="demand-course-list">' + (items.length ? items.map(course => {
+                const count = Number(course.registrada || 0);
+                const status = count <= 20 ? ['Adecuado', 'green'] : count <= 41 ? ['Regular', 'yellow'] : count <= 61 ? ['Cerca al límite', 'orange'] : ['Exceso', 'red'];
+                return '<div class="demand-course"><span class="demand-dot ' + status[1] + '"></span><span class="demand-course-name">' + esc(course.nombre) + '</span><strong>' + count + '</strong><span class="demand-status ' + status[1] + '">' + status[0] + '</span></div>';
+            }).join('') : '<p class="muted">No hay cursos con demanda registrada en este ciclo.</p>') + '</div></details>';
+            return { html, items };
+        }));
+        if (!ctx.current() || sequence !== ticket) return;
+        const courses = sections.flatMap(section => section.items);
+        const capacityAverage = courses.length ? Math.round(courses.reduce((sum, course) => sum + Number(course.registrada || 0), 0) / (courses.length * 100) * 100) : 0;
+        ctx.root.querySelector('[data-content]').innerHTML = '<div class="demand-layout"><div class="demand-left">' +
+            statCards([['Total matriculados', total.toLocaleString('es-PE')], ['Capacidad promedio', capacityAverage + '%']]) +
+            '<section class="card demand-chart-card"><h2>Alumnos matriculados por ciclo</h2>' + chart + '</section></div>' +
+            '<section class="card demand-detail"><h2>Detalle por ciclo y curso</h2>' + sections.map(section => section.html).join('') + '</section></div><p class="muted">' + esc(summary.data.advertencia || 'Datos calculados a partir de las prematrículas registradas.') + '</p>';
     };
     ctx.on('submit', async event => {
         if (!event.target.matches('[data-filters]')) return;
-        event.preventDefault(); query = queryFrom(event.target); page = 1; await load();
+        event.preventDefault(); query = queryFrom(event.target); await load();
     });
     ctx.on('click', async event => {
         const pageButton = event.target.closest('[data-page]');
         if (pageButton) { page = Number(pageButton.dataset.page); await load(); return; }
         const trigger = event.target.closest('[data-action]');
         if (!trigger) return;
-        const { academic_period_id: period, ...filters } = query;
+        const { academic_period_id: period } = query;
         if (trigger.dataset.action === 'export') {
-            await busy(trigger, () => ctx.request('/coordinator/academic-periods/' + period + '/demand/export', { query: filters, download: true, filename: 'demanda-' + period + '.csv' }));
+            await busy(trigger, () => ctx.request('/coordinator/academic-periods/' + period + '/demand/export', { download: true, filename: 'demanda-' + period + '.csv' }));
         }
-        if (trigger.dataset.action === 'interested') await pagedDetail(ctx, 'Estudiantes interesados', '/coordinator/academic-periods/' + period + '/demand/courses/' + trigger.dataset.id + '/students',
-            [['Código', 'codigo_universitario'], ['Nombres', 'nombres'], ['Apellidos', 'apellidos'], ['Revisión', 'revision_id'], ['Preferencia', 'preferencia_turno', row => esc(label(row.preferencia_turno))], ['Validación', 'estado_validacion', row => badge(row.estado_validacion)]],
-            { estado_validacion: filters.estado_validacion, preferencia_turno: filters.preferencia_turno });
     });
     await load();
 }
