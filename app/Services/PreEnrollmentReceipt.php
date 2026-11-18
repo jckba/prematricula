@@ -195,7 +195,7 @@ HTML;
 
         $photoHtml = $photoDataUri !== ''
             ? "<img src=\"{$photoDataUri}\" alt=\"Foto estudiante\" />"
-            : "<div style=\"width:100%;height:100%;background:#e5e5e5;\"></div>";
+            : '<div style="width:100%;height:100%;background:#e5e5e5;"></div>';
 
         $qrHtml = $qrDataUri !== ''
             ? "<img src=\"{$qrDataUri}\" alt=\"Código QR de validación\" />"
