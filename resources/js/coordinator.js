@@ -23,15 +23,35 @@ async function dashboard(ctx, user) {
     content.innerHTML = '<section class="dashboard-analytics-heading"><div><h2>Demanda académica</h2><p>Monitorea la matrícula y demanda por ciclo y curso</p></div><label>Filtrar por período <select data-demand-period>' + periodsResponse.data.map(period => '<option value="' + esc(period.id) + '">' + esc(period.codigo) + '</option>').join('') + '</select></label></section><div data-demand-dashboard></div>' + content.innerHTML;
     const demandTarget = content.querySelector('[data-demand-dashboard]');
     let demandTicket = 0;
+    let curriculumCourses = null;
     const renderDemand = async periodId => {
         const ticket = ++demandTicket;
         if (!periodId) { demandTarget.innerHTML = '<p class="empty">No hay períodos disponibles.</p>'; return; }
-        const summary = await ctx.request('/coordinator/academic-periods/' + periodId + '/summary');
-        const cycles = summary.data.ciclos || [];
-        const groups = await Promise.all(cycles.map(async cycle => {
-            const response = await ctx.request('/coordinator/academic-periods/' + periodId + '/demand', { query: { ciclo: cycle.ciclo, per_page: 100 } });
-            return { cycle, courses: response.data.cursos || [] };
-        }));
+        if (!curriculumCourses) {
+            const first = await ctx.request('/courses', { query: { page: 1, per_page: 100 } });
+            curriculumCourses = [...(first.data || [])];
+            for (let page = 2; page <= (first.meta?.last_page || 1); page++) {
+                const next = await ctx.request('/courses', { query: { page, per_page: 100 } });
+                curriculumCourses.push(...(next.data || []));
+            }
+        }
+        const demandPath = '/coordinator/academic-periods/' + periodId + '/demand';
+        const firstDemand = await ctx.request(demandPath, { query: { per_page: 100, page: 1 } });
+        const demandCourses = [...(firstDemand.data.cursos || [])];
+        const lastDemandPage = firstDemand.data.paginacion?.last_page || 1;
+        for (let page = 2; page <= lastDemandPage; page++) {
+            const next = await ctx.request(demandPath, { query: { per_page: 100, page } });
+            demandCourses.push(...(next.data.cursos || []));
+        }
+        const counts = new Map(demandCourses.map(course => [String(course.course_id), Number(course.registrada || 0)]));
+        const byCycle = new Map();
+        curriculumCourses.forEach(course => {
+            const courses = byCycle.get(course.ciclo) || [];
+            courses.push({ ...course, registrada: counts.get(String(course.id)) || 0 });
+            byCycle.set(course.ciclo, courses);
+        });
+        const groups = [...byCycle.entries()].sort(([a], [b]) => a - b).map(([cycle, courses]) => ({ cycle, courses }));
+        const cycles = groups.map(group => ({ ciclo: group.cycle, registrada: group.courses.reduce((sum, course) => sum + course.registrada, 0) }));
         if (!ctx.current() || ticket !== demandTicket) return;
         const total = cycles.reduce((sum, cycle) => sum + Number(cycle.registrada || 0), 0);
         const courses = groups.flatMap(group => group.courses);
@@ -43,7 +63,7 @@ async function dashboard(ctx, user) {
         }).join('') + '</div>';
         const accordion = groups.map(({ cycle, courses: rows }) => '<details class="demand-cycle"><summary>Ciclo ' + esc(cycle.ciclo) + '<span>' + Number(cycle.registrada || 0).toLocaleString('es-PE') + ' estudiantes</span></summary><div class="demand-course-list">' + rows.map(course => {
             const count = Number(course.registrada || 0);
-            const state = count <= 20 ? ['Adecuado', 'green'] : count <= 41 ? ['Regular', 'yellow'] : count <= 61 ? ['Cerca al límite', 'orange'] : ['Exceso', 'red'];
+            const state = count === 0 ? ['Sin registros / Pendiente', 'gray'] : count <= 20 ? ['Adecuado', 'green'] : count <= 41 ? ['Regular', 'yellow'] : count <= 61 ? ['Cerca al límite', 'orange'] : ['Exceso', 'red'];
             return '<div class="demand-course"><span class="demand-dot ' + state[1] + '"></span><span class="demand-course-name">' + esc(course.nombre) + '</span><strong>' + count + '</strong><span class="demand-status ' + state[1] + '">' + state[0] + '</span></div>';
         }).join('') + '</div></details>').join('');
         demandTarget.innerHTML = '<div class="stat-grid"><article class="stat-card"><p>Total matriculados</p><strong>' + total.toLocaleString('es-PE') + '</strong></article><article class="stat-card"><p>Capacidad promedio</p><strong>' + average + '%</strong></article></div><div class="demand-layout"><section class="card demand-chart-card"><h2>Alumnos matriculados por ciclo</h2>' + chart + '</section><section class="card demand-detail"><h2>Detalle por ciclo y curso</h2>' + (accordion || '<p class="muted">Aún no hay demanda registrada en este período.</p>') + '</section></div>';

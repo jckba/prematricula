@@ -432,7 +432,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 .demand-course-name { overflow-wrap: anywhere; }
 .demand-dot { width: 10px; height: 10px; border-radius: 50%; }
 .demand-dot.green { background: #17833c; }.demand-dot.yellow { background: #f0c928; }.demand-dot.orange { background: #e88918; }.demand-dot.red { background: #c72d32; }
-.demand-status { font-size: .7rem; text-align: right; }.demand-status.green { color: #176333; }.demand-status.yellow { color: #8a7410; }.demand-status.orange { color: #a45a0d; }.demand-status.red { color: #a5222a; }
+.demand-dot.gray { background: #9aa4af; }.demand-status { font-size: .7rem; text-align: right; }.demand-status.green { color: #176333; }.demand-status.yellow { color: #8a7410; }.demand-status.orange { color: #a45a0d; }.demand-status.red { color: #a5222a; }.demand-status.gray { color: #687481; }
 @media(max-width:900px) { .demand-layout { grid-template-columns: 1fr; } }
 @media(max-width:500px) { .demand-course { grid-template-columns: 10px minmax(0,1fr) 32px; }.demand-status { grid-column: 2 / -1; text-align: left; } }
 @media (max-width: 700px) {
