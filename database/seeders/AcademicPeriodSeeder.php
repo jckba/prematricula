@@ -14,15 +14,9 @@ class AcademicPeriodSeeder extends Seeder
             return;
         }
 
-        AcademicPeriod::firstOrCreate(['codigo' => '2026-I'], [
-            'fecha_inicio' => '2026-04-13',
-            'fecha_fin' => '2026-07-31',
-            'estado' => AcademicPeriodStatus::CERRADO,
-        ]);
-
         AcademicPeriod::firstOrCreate(['codigo' => '2026-II'], [
             'fecha_inicio' => '2026-08-24',
-            'fecha_fin' => '2026-12-11',
+            'fecha_fin' => '2026-12-12',
             'estado' => AcademicPeriodStatus::EN_CURSO,
         ]);
 

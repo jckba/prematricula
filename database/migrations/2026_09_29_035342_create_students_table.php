@@ -20,7 +20,7 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
-            $table->string('codigo_universitario', 30)
+            $table->string('codigo_universitario', 10)
                 ->unique();
 
             $table->string('nombres', 100);

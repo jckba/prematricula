@@ -1,6 +1,7 @@
 <?php
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -15,6 +16,16 @@ Route::middleware('guest')->group(function () {
         AuthController::class,
         'login',
     ])->middleware('throttle:login')->name('login.store');
+
+    Route::get('/register', [
+        RegisteredUserController::class,
+        'create',
+    ])->name('register');
+
+    Route::post('/register', [
+        RegisteredUserController::class,
+        'store',
+    ])->middleware('throttle:5,1')->name('register.store');
 });
 
 Route::middleware('auth')->group(function () {

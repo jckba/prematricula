@@ -43,6 +43,12 @@
             </div>
             <button class="btn login-submit" type="submit">Ingresar</button>
         </form>
+        <div class ="login-help">
+            <p>
+                ¿No tienes una cuenta?
+                <a href="{{ route('register') }}">Regístrate aquí</a>
+            </p>
+        </div>
         <details class="login-help">
             <summary>
                 <span class="login-help-line" aria-hidden="true"></span>
@@ -54,6 +60,11 @@
             </summary>
             <p>Ingresa tu correo institucional o tu código universitario completo. Si no puedes acceder, comunícate con la secretaría de tu escuela para verificar tu cuenta.</p>
         </details>
+        @if (session('status'))
+            <div class="notice notice-success" role="status">
+                {!! nl2br(e(session('status'))) !!}
+            </div>
+        @endif
         <noscript><p class="notice notice-danger">Activa JavaScript para utilizar el portal y autenticarte.</p></noscript>
     </div>
 </section>

@@ -534,10 +534,6 @@ HTML;
             <td class="val">{$periodo}</td>
         </tr>
         <tr>
-            <td class="lbl">PREFERENCIA:</td>
-            <td class="val">{$preferencia}</td>
-        </tr>
-        <tr>
             <td class="lbl">FECHA Y HORA DE EMISIÓN:</td>
             <td class="val">{$fechaHoraEmision}</td>
         </tr>

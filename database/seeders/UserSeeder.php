@@ -32,7 +32,7 @@ class UserSeeder extends Seeder
             'estado' => RecordStatus::ACTIVO,
         ]);
 
-        User::firstOrCreate(['correo_institucional' => 'secretaria.demo@unitru.edu.pe'], [
+        User::firstOrCreate(['correo_institucional' => 'secretaria@unitru.edu.pe'], [
             'password' => 'password',
             'rol' => UserRole::COORDINADOR,
             'cargo' => CoordinatorPosition::SECRETARIA,
