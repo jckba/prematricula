@@ -18,39 +18,52 @@ RUN npm run build
 # Etapa 2: Aplicación Laravel
 FROM php:8.4-apache
 
+# Dependencias del sistema y extensiones PHP
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     libxml2-dev \
     libonig-dev \
     libzip-dev \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
     unzip \
-    && docker-php-ext-install \
+    && docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
         pdo_pgsql \
         mbstring \
         dom \
         simplexml \
         zip \
+        gd \
     && a2enmod rewrite headers \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
+# Código Laravel
 COPY . .
 
-# Copiar recursos frontend compilados
+# Recursos frontend compilados
 COPY --from=frontend /app/public/build ./public/build
 
-# Instalar dependencias PHP
+# Dependencias PHP
 RUN composer install \
     --no-dev \
     --prefer-dist \
     --no-interaction \
     --optimize-autoloader
 
-# Configurar Apache
+# Verificar extensiones necesarias
+RUN php -m | grep -iE '^(gd|pdo_pgsql|mbstring|dom|simplexml|zip)$'
+
+# Configuración Apache
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
 RUN sed -ri \
