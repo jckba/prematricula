@@ -23,8 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        DB::prohibitDestructiveCommands(! $this->app->environment('testing') ||
-            DB::connection()->getDriverName() !== 'pgsql' || DB::connection()->getDatabaseName() !== 'prematricula_test');
+       // DB::prohibitDestructiveCommands($this->app->isProduction() ||
+         //   DB::connection()->getDriverName() !== 'pgsql' || DB::connection()->getDatabaseName() !== 'prematricula_test');
 
         RateLimiter::for('login', function (Request $request): array {
             $identifier = $request->is('api/*')
