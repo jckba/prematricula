@@ -51,9 +51,11 @@ class PreEnrollmentReceipt
             $y += 17;
         }
         $y += 6;
-        $columns = [72.0, $width - 220.0, 48.0, 100.0];
-        $offsets = [36.0, 108.0, 108.0 + $columns[1], 156.0 + $columns[1]];
-        foreach (['Código', 'Curso', 'Créditos', 'Preferencia'] as $index => $title) {
+        // TURNO-OCULTO: la columna "Preferencia" no se imprime por ahora; su ancho (100) pasa a "Curso".
+        // Para reactivarla: $columns = [72.0, $width - 220.0, 48.0, 100.0], offset 156.0 + $columns[1] y el título/celda 'Preferencia'.
+        $columns = [72.0, $width - 120.0, 48.0];
+        $offsets = [36.0, 108.0, 108.0 + $columns[1]];
+        foreach (['Código', 'Curso', 'Créditos'] as $index => $title) {
             $canvas->text($offsets[$index], $y, $title, $bold, 8.0);
         }
         $y += 19;
@@ -64,7 +66,7 @@ class PreEnrollmentReceipt
             $height = 0.0;
             foreach ($snapshot['detalles'] as $detail) {
                 $cells = [];
-                foreach ([$detail['codigo'], $detail['nombre'], (string) $detail['creditos'], $detail['preferencia_turno']] as $index => $text) {
+                foreach ([$detail['codigo'], $detail['nombre'], (string) $detail['creditos']] as $index => $text) { // TURNO-OCULTO: $detail['preferencia_turno']
                     $cells[] = $this->wrap($text, $columns[$index] - 6, $font, $size, $metrics);
                 }
                 $rowHeight = (max(array_map(count(...), $cells)) * 1.3 + 0.7) * $size;

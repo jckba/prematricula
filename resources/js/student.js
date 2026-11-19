@@ -1,11 +1,9 @@
 import { api } from './api';
-import { escape, label, date, badge, busy, heading, empty, table, pagination, action, detail, icon, quickLink } from './ui';
-import { enrollment, enrollmentDetail } from './student-enrollment';
+import { escape, date, badge, busy, heading, pagination, icon, quickLink, openPdf } from './ui';
+import { enrollment } from './student-enrollment';
 export async function render(section, root, user) {
     if (section === 'pre-enrollment') return enrollment(root);
     if (section === 'enrollments') return history(root);
-    if (section === 'academic-history') return academic(root);
-    if (section === 'catalog') return catalog(root);
     const [requests, availability] = await Promise.all([
         api('/student/pre-enrollments'),
         api('/student/pre-enrollment/available-courses').then(response => ({ data: response.data }), error => ({ error })),
@@ -19,107 +17,60 @@ export async function render(section, root, user) {
         if (!root.isConnected) return;
         current = response.data.find(row => row.periodo.id === available.periodo.id);
     }
-    const firstName = (current?.estudiante || latest?.estudiante)?.nombres?.trim().split(/\s+/)[0];
+    const profile = current?.estudiante || latest?.estudiante;
+    const fullName = [profile?.nombres, profile?.apellidos].map(part => part?.trim()).filter(Boolean).join(' ');
     const periodCode = available?.periodo.codigo || current?.periodo.codigo;
     const maximum = available?.creditos_maximos;
     const credits = current?.creditos_totales ?? (available ? 0 : null);
     const progress = maximum > 0 && credits != null ? '<progress aria-label="Créditos seleccionados respecto a tu máximo personal" value="' + escape(credits) + '" max="' + escape(maximum) + '">' + escape(credits) + ' / ' + escape(maximum) + '</progress>' : '';
     const metric = (title, symbol, content) => '<article class="dashboard-metric"><span class="metric-icon">' + icon(symbol) + '</span><div><h2>' + escape(title) + '</h2>' + content + '</div></article>';
     const submitted = current?.estado === 'ENVIADA';
-    const bannerTitle = available ? (submitted ? 'Tu prematrícula está registrada' : 'Continúa con tu prematrícula') : (availability.error?.status === 422 ? 'Prematrícula no disponible' : 'No pudimos comprobar la apertura');
-    const bannerText = available ? ('Período ' + available.periodo.codigo + '. ' + (submitted ? 'Consulta tu solicitud y descarga tu constancia.' : 'Selecciona tus asignaturas y revisa tu carga antes de enviar.')) : availability.error?.message || 'Ingresa a tu prematrícula para consultar su disponibilidad.';
-    root.innerHTML = heading(firstName ? 'Hola, ' + firstName : 'Hola, te damos la bienvenida', 'Consulta tu prematrícula y elige tu siguiente paso.') +
+    // Estado del aviso: new (aún no inicia, azul) · draft (borrador sin registrar, ámbar) · done (registrada, verde) · closed (sin ventana).
+    const stage = !available ? 'closed' : submitted ? 'done' : current ? 'draft' : 'new';
+    const banner = {
+        new: { title: 'Inicia tu prematrícula', text: 'El período ' + available?.periodo.codigo + ' está abierto. Elige tus cursos y regístralos.', action: 'Empezar prematrícula', symbol: 'calendar' },
+        draft: { title: 'Continúa con tu prematrícula', text: 'Período ' + available?.periodo.codigo + '. Ya tienes cursos elegidos; revísalos y registra tu prematrícula.', action: 'Continuar prematrícula', symbol: 'file' },
+        done: { title: 'Tu prematrícula está registrada', text: 'Período ' + available?.periodo.codigo + '. Revisa tus cursos registrados y genera tu constancia PDF.', action: 'Ver mi prematrícula', symbol: 'check-circle' },
+        closed: { title: availability.error?.status === 422 ? 'Prematrícula no disponible' : 'No pudimos comprobar la apertura', text: availability.error?.message || 'Ingresa a tu prematrícula para consultar su disponibilidad.', action: 'Revisar disponibilidad', symbol: 'file' },
+    }[stage];
+    root.innerHTML = heading(fullName ? 'Hola, ' + fullName : 'Hola, te damos la bienvenida', 'Consulta tu prematrícula y elige tu siguiente paso.') +
         '<div class="dashboard-metrics">' +
         metric(available ? 'Período habilitado' : 'Último período registrado', 'calendar', '<strong>' + escape(periodCode || 'Sin registro') + '</strong><p>' + (available ? 'Disponible para prematrícula' : 'Consulta la disponibilidad abajo') + '</p>') +
-        metric(current ? 'Estado de la solicitud' : 'Mi prematrícula', 'file', current ? badge(current.estado) + '<p>' + (current.correccion_en_progreso ? 'Corrección en progreso' : submitted ? 'Envío registrado' : current.estado === 'BORRADOR' ? 'Aún no has enviado tu selección' : 'Registro histórico') + '</p>' : '<strong>Sin iniciar</strong><p>Tu selección aún no está registrada</p>') +
+        metric(current ? 'Estado de la prematrícula' : 'Mi prematrícula', 'file', current ? badge(current.estado) + '<p>' + (current.correccion_en_progreso ? 'Corrección en progreso' : submitted ? 'Envío registrado' : current.estado === 'BORRADOR' ? 'Aún no has enviado tu selección' : 'Registro histórico') + '</p>' : '<strong>Sin iniciar</strong><p>Tu selección aún no está registrada</p>') +
         metric('Créditos seleccionados', 'credits', '<strong>' + escape(credits ?? 'Sin dato') + (maximum != null ? '<span class="metric-limit"> / ' + escape(maximum) + '</span>' : '') + '</strong>' + (progress || '<p>' + (current ? 'De la solicitud mostrada' : 'Se mostrarán al iniciar') + '</p>')) +
-        '</div><section class="dashboard-callout" aria-labelledby="next-step-heading"><span class="callout-icon">' + icon(available ? 'calendar' : 'file') + '</span><div><h2 id="next-step-heading">' + escape(bannerTitle) + '</h2><p>' + escape(bannerText) + '</p></div><a class="btn" href="' + (submitted && available ? '#enrollments' : '#pre-enrollment') + '">' + (submitted && available ? 'Ver solicitud' : available ? 'Ir a prematrícula' : 'Revisar disponibilidad') + icon('arrow') + '</a></section>' +
-        (current?.validacion_academica ? '<div class="academic-status"><span>Validación académica</span>' + badge(current.validacion_academica.estado) + '<a href="#enrollments">Ver observaciones</a></div>' : '') +
+        '</div><section class="dashboard-callout dashboard-callout-' + stage + '" aria-labelledby="next-step-heading"><span class="callout-icon">' + icon(banner.symbol) + '</span><div><h2 id="next-step-heading">' + escape(banner.title) + '</h2><p>' + escape(banner.text) + '</p></div><a class="btn btn-raised" href="#pre-enrollment">' + escape(banner.action) + '</a></section>' +
+        // Oculto temporalmente: bloque "Validación académica" del inicio.
+        // (current?.validacion_academica ? '<div class="academic-status"><span>Validación académica</span>' + badge(current.validacion_academica.estado) + '<a href="#enrollments">Ver observaciones</a></div>' : '') +
         '<section class="quick-section" aria-labelledby="quick-heading"><h2 id="quick-heading">Servicios académicos</h2><div class="quick-grid">' +
         quickLink('#pre-enrollment', 'Mi prematrícula', 'Seleccionar y revisar cursos', 'book') +
-        quickLink('#academic-history', 'Historial académico', 'Consultar resultados oficiales', 'history') +
-        quickLink('#enrollments', 'Solicitudes y constancias', 'Ver envíos y descargar PDF', 'file') +
-        quickLink('#catalog', 'Catálogo de asignaturas', 'Consultar cursos y prerrequisitos', 'layers') +
-        '</div></section><details class="calendar-disclosure"><summary><span>' + icon('calendar') + 'Calendario académico</span><span class="disclosure-hint">Ver fechas</span></summary><div data-calendar></div></details>';
-    const calendarDetails = root.querySelector('.calendar-disclosure');
-    const calendar = root.querySelector('[data-calendar]');
-    let calendarLoaded = false;
-    const loadCalendar = async (page = 1) => {
-        calendar.setAttribute('aria-busy', 'true');
-        try {
-            const response = await api('/academic-periods', { query: { page } });
-            if (!root.isConnected) return;
-            calendar.innerHTML = '<p class="help-text">Fechas de clases y ventanas de prematrícula. Hora de Lima.</p>' +
-                (response.data.length ? '<div class="calendar-grid">' + response.data.map(period => '<article><div class="calendar-title"><h3>' + escape(period.codigo) + '</h3>' + badge(period.estado) + '</div><p>Clases: ' + escape(date(period.fecha_inicio)) + ' al ' + escape(date(period.fecha_fin)) + '</p>' +
-                    ((period.ventanas || []).map(window => '<p><strong>' + escape(label(window.tipo)) + '</strong><br>' + escape(date(window.fecha_inicio)) + ' — ' + escape(date(window.fecha_fin)) + '</p>').join('') || '<p>Sin ventanas registradas.</p>') + '</article>').join('') + '</div>' : empty('Aún no hay períodos académicos publicados.')) + pagination(response.meta);
-            calendar.querySelectorAll('[data-page]').forEach(button => button.onclick = () => busy(button, () => loadCalendar(button.dataset.page)));
-        } catch (error) {
-            if (!root.isConnected) return;
-            calendarLoaded = false;
-            calendar.innerHTML = '<p class="notice notice-warning">' + escape(error.message) + '</p><button type="button" class="btn btn-secondary" data-calendar-retry>Volver a intentar</button>';
-            calendar.querySelector('[data-calendar-retry]').onclick = event => busy(event.currentTarget, () => loadCalendar(page));
-        } finally { calendar.removeAttribute('aria-busy'); }
-    };
-    calendarDetails.addEventListener('toggle', () => {
-        if (!calendarDetails.open || calendarLoaded) return;
-        calendarLoaded = true;
-        loadCalendar();
-    });
+        quickLink('#enrollments', 'Historial de prematrículas', 'Períodos anteriores y constancias PDF', 'history') +
+        '</div></section>';
 }
+// Historial de prematrículas: tabla acumulativa (10 por página, paginación del API) con la constancia PDF de cada período.
 async function history(root, page = 1) {
     const response = await api('/student/pre-enrollments', { query: { page } });
     if (!root.isConnected) return;
-    root.innerHTML = heading('Solicitudes y constancias', 'Consulta tus envíos, revisiones y constancias originales.') + '<section class="card">' +
-        table([['Período', 'periodo.codigo'], ['Estado', '', row => badge(row.estado)], ['Validación', '', row => badge(row.validacion_academica?.estado)], ['Créditos', 'creditos_totales'], ['Envío', '', row => escape(date(row.fecha_envio))]], response.data, row => action('Ver solicitud', 'detail', row.id)) +
-        pagination(response.meta) + '</section><section data-student-detail></section>';
+    const rows = response.data || [];
+    const registered = row => row.estado === 'ENVIADA';
+    const status = row => registered(row)
+        ? '<span class="history-status history-status-done">Registrada</span>'
+        : '<span class="history-status history-status-pending">Sin registrar</span>';
+    const receipt = row => registered(row) && row.revision_vigente?.receipt_available
+        ? '<button type="button" class="btn btn-small btn-raised history-pdf" data-history-pdf="' + escape(row.id) + '" aria-label="Constancia PDF del período ' + escape(row.periodo.codigo) + ' (se abre en una pestaña nueva)" title="Abre la constancia en una pestaña nueva">' + icon('file') + '<span>Constancia PDF</span>' + icon('external').replace('ui-icon', 'ui-icon history-pdf-external') + '</button>'
+        : '<span class="muted">No disponible</span>';
+    const list = rows.length
+        ? '<div class="table-scroll history-table"><table><thead><tr><th>Período</th><th>Fecha de registro</th><th>N° cursos</th><th>N° créditos</th><th>Estado</th><th>Constancia</th></tr></thead><tbody>' +
+            rows.map(row => '<tr>' +
+                '<td data-label="Período"><strong>' + escape(row.periodo.codigo) + '</strong></td>' +
+                '<td data-label="Fecha de registro">' + (registered(row) ? escape(date(row.fecha_envio)) : '<span class="muted">—</span>') + '</td>' +
+                '<td data-label="N° cursos">' + escape(row.detalles?.length ?? 0) + '</td>' +
+                '<td data-label="N° créditos">' + escape(row.creditos_totales ?? 0) + '</td>' +
+                '<td data-label="Estado">' + status(row) + '</td>' +
+                '<td data-label="Constancia">' + receipt(row) + '</td></tr>').join('') +
+            '</tbody></table></div>' + pagination(response.meta)
+        : '<div class="empty"><strong>Aún no tienes prematrículas</strong><p>Cuando registres tu primera prematrícula aparecerá aquí con su constancia.</p><p><a class="btn" href="#pre-enrollment">Ir a mi prematrícula</a></p></div>';
+    root.innerHTML = heading('Historial de prematrículas', 'Revisa las prematrículas que registraste en cada período y abre su constancia en PDF.') +
+        '<section class="card history-card">' + list + '</section>';
     root.querySelectorAll('[data-page]').forEach(button => button.onclick = () => busy(button, () => history(root, button.dataset.page)));
-    root.querySelectorAll('[data-action="detail"]').forEach(button => button.onclick = () => busy(button, () => enrollmentDetail(root.querySelector('[data-student-detail]'), button.dataset.id)));
-}
-async function academic(root) {
-    const periods = await api('/academic-periods');
-    for (let page = 2; page <= (periods.meta?.last_page || 1); page++) {
-        if (!root.isConnected) break;
-        const next = await api('/academic-periods', { query: { page } });
-        if (!root.isConnected) return;
-        periods.data.push(...next.data);
-    }
-    if (!root.isConnected) return;
-    root.innerHTML = heading('Historial académico', 'Resultados oficiales. La nota no sustituye al estado académico oficial.') +
-        '<section class="card"><form class="toolbar"><label class="field">Período<select name="academic_period_id"><option value="">Todos los períodos</option>' +
-        periods.data.map(period => '<option value="' + escape(period.id) + '">' + escape(period.codigo) + '</option>').join('') +
-        '</select></label><button class="btn">Consultar</button></form><div data-results></div></section>';
-    const results = root.querySelector('[data-results]');
-    let sequence = 0;
-    const load = async (page = 1) => {
-        const current = ++sequence;
-        results.setAttribute('aria-busy', 'true');
-        try {
-        const response = await api('/student/academic-history', { query: { page, academic_period_id: root.querySelector('select').value } });
-        if (!root.isConnected || current !== sequence) return;
-        results.innerHTML = table([['Período', 'periodo.codigo'], ['Código', 'curso.codigo'], ['Asignatura', 'curso.nombre'], ['Nota final', 'nota_final'], ['Resultado oficial', '', row => badge(row.estado)]], response.data) + pagination(response.meta);
-        results.querySelectorAll('[data-page]').forEach(button => button.onclick = () => busy(button, () => load(button.dataset.page)));
-        } finally { if (current === sequence) results.removeAttribute('aria-busy'); }
-    };
-    root.querySelector('form').onsubmit = event => { event.preventDefault(); busy(event.submitter, () => load()); };
-    await load();
-}
-async function catalog(root) {
-    root.innerHTML = heading('Catálogo de asignaturas', 'El catálogo no representa tu elegibilidad para seleccionar cursos.') +
-        '<section class="card"><form class="toolbar"><label class="field">Código o nombre<input name="q" maxlength="100" type="search"></label><label class="field">Ciclo<input name="ciclo" type="number" min="1" max="32767"></label><button class="btn">Buscar</button></form><div data-results></div></section>';
-    const form = root.querySelector('form');
-    const results = root.querySelector('[data-results]');
-    let sequence = 0;
-    const load = async (page = 1) => {
-        const current = ++sequence;
-        results.setAttribute('aria-busy', 'true');
-        try {
-        const response = await api('/courses', { query: { ...Object.fromEntries(new FormData(form)), page } });
-        if (!root.isConnected || current !== sequence) return;
-        results.innerHTML = table([['Código', 'codigo'], ['Asignatura', 'nombre'], ['Ciclo', 'ciclo'], ['Créditos', 'creditos'], ['Estado', '', row => badge(row.estado)]], response.data, row => action('Prerrequisitos', 'course', row.id)) + pagination(response.meta);
-        results.querySelectorAll('[data-page]').forEach(button => button.onclick = () => busy(button, () => load(button.dataset.page)));
-        results.querySelectorAll('[data-action="course"]').forEach(button => button.onclick = () => busy(button, async () => { const response = await api('/courses/' + button.dataset.id); if (!root.isConnected) return; detail('Asignatura y prerrequisitos', response.data); }));
-        } finally { if (current === sequence) results.removeAttribute('aria-busy'); }
-    };
-    form.onsubmit = event => { event.preventDefault(); busy(event.submitter, () => load()); };
-    await load();
+    root.querySelectorAll('[data-history-pdf]').forEach(button => button.onclick = () => busy(button, () => openPdf('/student/pre-enrollments/' + button.dataset.historyPdf + '/receipt')));
 }

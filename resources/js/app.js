@@ -47,10 +47,48 @@ async function startApp() {
     $('#user-email').textContent = user.correo_institucional;
     $('#user-role').textContent = label(user.cargo || user.rol);
     $('#user-avatar').textContent = user.correo_institucional.slice(0, 1).toUpperCase();
+    $('#user-menu-email').textContent = user.correo_institucional;
+    $('#user-menu-role').textContent = label(user.cargo || user.rol);
     document.querySelectorAll('[data-section][data-icon]').forEach(link => link.insertAdjacentHTML('afterbegin', icon(link.dataset.icon)));
     document.querySelectorAll('[data-shell-icon]').forEach(element => element.innerHTML = icon(element.dataset.shellIcon));
+    // Menú lateral contraíble (escritorio): barra de íconos con tooltip; la preferencia se recuerda en este navegador.
+    document.querySelectorAll('#sidebar nav > a').forEach(link => { link.dataset.tooltip = link.textContent.trim(); });
+    const collapseButton = $('#sidebar-collapse');
+    const applyCollapse = collapsed => {
+        shell.classList.toggle('sidebar-collapsed', collapsed);
+        const text = collapsed ? 'Expandir menú' : 'Contraer menú';
+        collapseButton.setAttribute('aria-expanded', String(!collapsed));
+        collapseButton.setAttribute('aria-label', text); collapseButton.title = text;
+        collapseButton.innerHTML = icon(collapsed ? 'panel-open' : 'panel-close');
+    };
+    let startCollapsed = false;
+    try { startCollapsed = localStorage.getItem('pm_sidebar_collapsed') === '1'; } catch { startCollapsed = false; }
+    applyCollapse(startCollapsed);
+    collapseButton.onclick = () => {
+        const collapsed = !shell.classList.contains('sidebar-collapsed');
+        applyCollapse(collapsed);
+        try { localStorage.setItem('pm_sidebar_collapsed', collapsed ? '1' : '0'); } catch { /* preferencia opcional */ }
+    };
     splash.remove(); shell.hidden = false;
     $('#logout-btn').onclick = event => busy(event.currentTarget, logout);
+    // Menú del avatar (estándar: avatar → desplegable con "Cerrar sesión").
+    const userToggle = $('#user-menu-toggle'); const userPanel = $('#user-menu-panel');
+    function closeUserMenu(returnFocus = false) {
+        if (userPanel.hidden) return;
+        userPanel.hidden = true; userToggle.setAttribute('aria-expanded', 'false');
+        if (returnFocus) userToggle.focus();
+    }
+    userToggle.onclick = () => {
+        if (!userPanel.hidden) return closeUserMenu();
+        userPanel.hidden = false; userToggle.setAttribute('aria-expanded', 'true');
+        userPanel.querySelector('[role=menuitem]')?.focus();
+    };
+    document.addEventListener('click', event => { if (!event.target.closest('.user-menu')) closeUserMenu(); });
+    userPanel.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { event.preventDefault(); closeUserMenu(true); }
+        if (event.key === 'Tab') closeUserMenu();
+    });
+    window.addEventListener('hashchange', () => closeUserMenu());
     const toggle = $('#menu-toggle'); const sidebar = $('#sidebar');
     const mobileMenu = window.matchMedia('(max-width: 960px)');
     function closeMenu(returnFocus = false) {
@@ -92,7 +130,7 @@ async function startApp() {
         closeMenu(); $('#flash').hidden = true;
         const previous = $('#screen');
         const root = document.createElement('section'); root.id = 'screen'; root.setAttribute('aria-busy', 'true');
-        root.innerHTML = '<div class="empty" role="status">Cargando información académica…</div>'; previous.replaceWith(root);
+        root.innerHTML = '<div class="empty loading" role="status">Cargando información académica…</div>'; previous.replaceWith(root);
         try { await module.render(key, root, user); }
         catch (error) {
             if (current !== generation) return;

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="same-origin">
     <title>@yield('title', 'Prematrícula') · UNT Informática</title>
+    <link rel="icon" href="{{ asset('favicon.ico') }}?v=2" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}?v=2">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v=2">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -21,13 +24,14 @@
         </a>
         <nav>@yield('nav')</nav>
         <div class="sidebar-bottom">
-            <button id="logout-btn" class="logout-button" type="button"><span data-shell-icon="logout" aria-hidden="true"></span>Cerrar sesión</button>
+            {{-- "Cerrar sesión" se movió al menú del avatar (topbar). --}}
             <span class="sidebar-caption">Universidad Nacional de Trujillo</span>
         </div>
     </aside>
     <div class="app-main">
         <header class="topbar">
             <div class="topbar-start">
+                <button id="sidebar-collapse" class="sidebar-collapse" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="Contraer menú" title="Contraer menú"><span data-shell-icon="panel-close" aria-hidden="true"></span></button>
                 <button id="menu-toggle" class="icon-button" type="button" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false"><span data-shell-icon="menu" aria-hidden="true"></span></button>
                 <div class="topbar-title">
                     <span class="institution-name">Universidad Nacional de Trujillo</span>
@@ -35,12 +39,19 @@
                 </div>
             </div>
             <div class="user-menu">
-                <span id="user-avatar" class="user-avatar" aria-hidden="true"></span>
-                <div class="user-identity"><span id="user-email"></span><small id="user-role"></small></div>
+                <button id="user-menu-toggle" class="user-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu-panel" aria-label="Menú de usuario">
+                    <span id="user-avatar" class="user-avatar" aria-hidden="true"></span>
+                    <span class="user-identity"><span id="user-email"></span><small id="user-role"></small></span>
+                    <span class="user-menu-chevron" data-shell-icon="chevron" aria-hidden="true"></span>
+                </button>
+                <div id="user-menu-panel" class="user-menu-panel" role="menu" aria-label="Opciones de usuario" hidden>
+                    <div class="user-menu-header"><strong id="user-menu-email"></strong><small id="user-menu-role"></small></div>
+                    <button id="logout-btn" class="user-menu-item" type="button" role="menuitem"><span data-shell-icon="logout" aria-hidden="true"></span>Cerrar sesión</button>
+                </div>
             </div>
         </header>
         <main id="main" class="main-content">
-            <div id="flash" role="status" hidden></div>
+            <div id="flash" role="status" data-toast hidden></div>
             <section id="screen" aria-live="polite"></section>
         </main>
         <footer class="app-footer"><span>UNT · Informática</span><span>La prematrícula no constituye matrícula definitiva.</span></footer>

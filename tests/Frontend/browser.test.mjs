@@ -20,7 +20,6 @@ let activeRole = 'ESTUDIANTE';
 let draft = structuredClone(enrollment);
 let historyResponses = null;
 let availabilityFailure = null;
-let calendarFailure = false;
 function responseFor(path, method, body, query) {
     if (path === '/api/v1/coordinator/curriculum/validate' || path === '/api/v1/coordinator/curriculum/import') return { data: { valid: true, sha256: 'a'.repeat(64), catalog_fingerprint: 'b'.repeat(64), summary: { created: 1, updated: 0, unchanged: 0 }, changes: [{ row: 2, codigo: '00101', action: 'create', fields: ['nombre'], protected: false }], errors: [] } };
     if (path === '/api/v1/me') return { data: user(activeRole) };
@@ -80,10 +79,6 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
                     res.writeHead(availabilityFailure.status, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ message: availabilityFailure.message })); return;
                 }
-                if (url.pathname === '/api/v1/academic-periods' && calendarFailure) {
-                    res.writeHead(503, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ message: 'Calendario temporalmente no disponible.' })); return;
-                }
                 const payload = responseFor(url.pathname, req.method, body, url.searchParams);
                 res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(payload)); return;
             }
@@ -106,9 +101,17 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
     const profile = mkdtempSync(join(tmpdir(), 'prematricula-browser-'));
     const browser = spawn(browserPath, ['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-port=0','--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: ['ignore','ignore','pipe'] });
     let stderr = ''; const endpoint = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('No inició el navegador')), 15000);
-        browser.stderr.on('data', chunk => { stderr += chunk; const match = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (match) { clearTimeout(timer); resolve(match[1]); } });
-        browser.once('error', reject);
+        // Edge 157+ ya no siempre imprime "DevTools listening on" en stderr; también se lee el archivo DevToolsActivePort del perfil.
+        const done = value => { clearTimeout(timer); clearInterval(poll); resolve(value); };
+        const timer = setTimeout(() => { clearInterval(poll); reject(new Error('No inició el navegador')); }, 15000);
+        const poll = setInterval(() => {
+            try {
+                const [port, path] = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split(/\r?\n/);
+                if (port && path) done('ws://127.0.0.1:' + port.trim() + path.trim());
+            } catch { /* el archivo aún no existe */ }
+        }, 200);
+        browser.stderr.on('data', chunk => { stderr += chunk; const match = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (match) done(match[1]); });
+        browser.once('error', error => { clearTimeout(timer); clearInterval(poll); reject(error); });
     });
     const socket = new WebSocket(endpoint); await once(socket, 'open');
     let sequence = 0; const waiting = new Map(); const runtimeErrors = []; let loadResolver;
@@ -183,9 +186,32 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
                 assert.ok(cards[2].includes('0 / 22'));
                 assert.equal(requests.some(item => item.method !== 'GET' || item.path === '/api/v1/student/pre-enrollment'), false);
                 assert.equal(requests.some(item => item.path === '/api/v1/academic-periods'), false);
-                assert.equal(await evaluate('document.querySelectorAll("#sidebar [data-section] svg").length'), 5);
+                assert.equal(await evaluate('document.querySelectorAll("#sidebar [data-section] svg").length'), 3);
                 assert.equal(await evaluate('document.querySelector("#user-role").textContent'), 'Estudiante');
                 assert.equal(await evaluate('document.querySelector("#user-avatar").textContent'), 'P');
+                assert.equal(await evaluate('document.querySelector("#sidebar #logout-btn")'), null);
+                assert.equal(await evaluate('document.querySelector("#user-menu-panel").hidden'), true);
+                await evaluate('document.querySelector("#user-menu-toggle").click()');
+                assert.equal(await evaluate('document.querySelector("#user-menu-toggle").getAttribute("aria-expanded")'), 'true');
+                assert.equal(await evaluate('document.activeElement.id'), 'logout-btn');
+                assert.equal(await evaluate('document.querySelector("#logout-btn").textContent.trim()'), 'Cerrar sesión');
+                await screenshot('user-menu-open');
+                await evaluate('document.querySelector("#logout-btn").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))');
+                assert.equal(await evaluate('document.querySelector("#user-menu-panel").hidden'), true);
+                assert.equal(await evaluate('document.activeElement.id'), 'user-menu-toggle');
+                assert.equal(await evaluate('document.querySelector("#sidebar-collapse").getAttribute("aria-expanded")'), 'true');
+                await evaluate('document.querySelector("#sidebar-collapse").click()');
+                assert.equal(await evaluate('document.querySelector("#app").classList.contains("sidebar-collapsed")'), true);
+                assert.equal(await evaluate('document.querySelector("#sidebar-collapse").getAttribute("aria-label")'), 'Expandir menú');
+                await waitFor('document.querySelector("#sidebar").getBoundingClientRect().width === 72');
+                assert.equal(await evaluate('document.querySelector("[data-section=dashboard]").dataset.tooltip'), 'Inicio');
+                await screenshot('sidebar-collapsed');
+                await navigate('/student');
+                await waitFor('document.querySelector("#app") && !document.querySelector("#app").hidden');
+                assert.equal(await evaluate('document.querySelector("#app").classList.contains("sidebar-collapsed")'), true);
+                await evaluate('document.querySelector("#sidebar-collapse").click()');
+                assert.equal(await evaluate('localStorage.getItem("pm_sidebar_collapsed")'), '0');
+                await waitFor('document.querySelector("#sidebar").getBoundingClientRect().width === 224');
                 await screenshot('student-dashboard-desktop');
 
                 await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -202,12 +228,17 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
             ];
             try {
                 await navigate('/student');
-                await waitFor('document.querySelector(".academic-status") && !document.querySelector("#screen").hasAttribute("aria-busy")');
+                await waitFor('document.querySelector(".dashboard-metrics") && !document.querySelector("#screen").hasAttribute("aria-busy")');
 
                 assert.ok((await evaluate('document.querySelectorAll(".dashboard-metric")[1].textContent')).includes('Enviada'));
                 assert.ok((await evaluate('document.querySelectorAll(".dashboard-metric")[2].textContent')).includes('6 / 22'));
-                assert.ok((await evaluate('document.querySelector(".academic-status").textContent')).includes('Requiere ajuste'));
-                assert.equal(await evaluate('document.querySelector(".dashboard-callout a").getAttribute("href")'), '#enrollments');
+                // Bloque "Validación académica" comentado en student.js.
+                // assert.ok((await evaluate('document.querySelector(".academic-status").textContent')).includes('Requiere ajuste'));
+                assert.equal(await evaluate('document.querySelector(".academic-status")'), null);
+                assert.equal(await evaluate('document.querySelector(".dashboard-callout a").getAttribute("href")'), '#pre-enrollment');
+                assert.equal(await evaluate('document.querySelector(".dashboard-callout").classList.contains("dashboard-callout-done")'), true);
+                assert.equal(await evaluate('document.querySelector(".dashboard-callout .callout-icon circle") !== null'), true);
+                await screenshot('student-dashboard-registered');
             } finally { historyResponses = null; }
         });
         for (const scenario of [
@@ -227,34 +258,25 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
                 } finally { availabilityFailure = null; }
             });
         }
-        await t.test('student calendar loads on demand and recovers after a failed request', async () => {
-            await navigate('/student');
-            await waitFor('document.querySelector(".calendar-disclosure") && !document.querySelector("#screen").hasAttribute("aria-busy")');
-            calendarFailure = true;
-            try {
-                await evaluate('document.querySelector(".calendar-disclosure summary").click()');
-                await waitFor('document.querySelector("[data-calendar-retry]")');
-                assert.ok((await evaluate('document.querySelector("[data-calendar]").textContent')).includes('Calendario temporalmente no disponible.'));
-
-                calendarFailure = false;
-                await evaluate('document.querySelector("[data-calendar-retry]").click()');
-                await waitFor('document.querySelector(".calendar-grid")');
-                assert.ok((await evaluate('document.querySelector(".calendar-grid").textContent')).includes('PRUEBA'));
-            } finally { calendarFailure = false; }
-        });
         await t.test('student dashboard escapes student names and explains an empty history', async () => {
             historyResponses = [page([{ ...structuredClone(enrollment), estudiante: { ...student, nombres: '<script>evil()</script>' } }])];
             try {
                 await navigate('/student');
                 await waitFor('document.querySelector(".dashboard-metrics") && !document.querySelector("#screen").hasAttribute("aria-busy")');
                 assert.equal(await evaluate('document.querySelector("#screen h1 script")'), null);
-                assert.ok((await evaluate('document.querySelector("#screen h1").textContent')).includes('<script>evil()</script>'));
+                assert.equal(await evaluate('document.querySelector("#screen h1").textContent'), 'Hola, <script>evil()</script> de prueba');
+                assert.equal(await evaluate('document.querySelector(".dashboard-callout").classList.contains("dashboard-callout-draft")'), true);
+                assert.equal(await evaluate('document.querySelector(".dashboard-callout h2").textContent'), 'Continúa con tu prematrícula');
 
                 historyResponses = [page([])];
                 await navigate('/student');
                 await waitFor('document.querySelector(".dashboard-metrics") && !document.querySelector("#screen").hasAttribute("aria-busy")');
                 assert.ok((await evaluate('document.querySelectorAll(".dashboard-metric")[1].textContent')).includes('Sin iniciar'));
                 assert.ok((await evaluate('document.querySelector("#screen h1").textContent')).includes('bienvenida'));
+                assert.equal(await evaluate('document.querySelector(".dashboard-callout").classList.contains("dashboard-callout-new")'), true);
+                assert.equal(await evaluate('document.querySelector(".dashboard-callout h2").textContent'), 'Inicia tu prematrícula');
+                assert.ok((await evaluate('document.querySelector(".dashboard-callout a").textContent')).includes('Empezar prematrícula'));
+                await screenshot('student-dashboard-new');
             } finally { historyResponses = null; }
         });
         await t.test('student navigation does not create draft on dashboard', async () => {
@@ -262,30 +284,70 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
             await waitFor('document.querySelector("#app") && !document.querySelector("#app").hidden && document.querySelector("#screen h1")');
             assert.equal(requests.some(request => request.path === '/api/v1/student/pre-enrollment' && request.method === 'GET'), false);
             assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
-            for (const section of ['catalog','academic-history','enrollments','pre-enrollment']) {
+            assert.equal(await evaluate('document.querySelector("[data-section=catalog], [data-section=academic-history], .calendar-disclosure")'), null);
+            for (const section of ['enrollments','pre-enrollment']) {
                 await evaluate('location.hash=' + JSON.stringify(section));
                 await waitFor('document.querySelector("[data-section=' + section + ']").getAttribute("aria-current") === "page" && document.querySelector("#screen h1") && !document.querySelector("#screen").hasAttribute("aria-busy")');
                 assert.equal(await evaluate('document.querySelector("#flash").hidden || !document.querySelector("#flash").textContent.includes("no contemplado")'), true);
             }
+            historyResponses = [{ ...page([
+                { ...structuredClone(enrollment), id: 7, estado: 'ENVIADA', periodo: { id: 2, codigo: '2027-I' }, fecha_envio: '2026-11-18T20:48:00Z', creditos_totales: 12, detalles: [{}, {}, {}, {}], revision_vigente: { id: 3, receipt_available: true } },
+                structuredClone(enrollment),
+            ]), meta: { current_page: 1, last_page: 2, total: 12 } }];
+            try {
+                await evaluate('location.hash="enrollments"');
+                await waitFor('document.querySelector(".history-card") && !document.querySelector("#screen").hasAttribute("aria-busy")');
+                assert.equal(await evaluate('document.querySelector("#screen h1").textContent'), 'Historial de prematrículas');
+                assert.equal(await evaluate('document.querySelector("[data-section=enrollments]").textContent.trim()'), 'Historial de prematrículas');
+                assert.equal(await evaluate('[...document.querySelectorAll(".history-table th")].map(th => th.textContent).join("|")'), 'Período|Fecha de registro|N° cursos|N° créditos|Estado|Constancia');
+                assert.equal(await evaluate('[...document.querySelectorAll(".history-status")].map(el => el.textContent).join("|")'), 'Registrada|Sin registrar');
+                assert.equal(await evaluate('document.querySelectorAll("[data-history-pdf]").length'), 1);
+                assert.equal(await evaluate('document.querySelector("[data-history-pdf] svg") !== null'), true);
+                assert.equal(await evaluate('document.querySelector("[data-history-toggle], .history-courses")'), null);
+                assert.ok((await evaluate('document.querySelector(".history-card .pagination").textContent')).includes('Página 1 de 2'));
+                await screenshot('student-history-desktop');
+            } finally { historyResponses = null; }
+            await evaluate('location.hash="pre-enrollment"');
+            await waitFor('document.querySelector("[data-cycle-select]") && !document.querySelector("#screen").hasAttribute("aria-busy")');
             await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
             await screenshot('student-desktop');
         });
         
-        await t.test('student can add, change preference, remove and submit with explicit confirmation', async () => {
-            await evaluate('document.querySelector("#course-search").value="no-existe";document.querySelector("#course-search").dispatchEvent(new Event("input",{bubbles:true}))');
-            assert.equal(await evaluate('document.querySelector("[data-course-empty]").hidden'), false);
-            assert.equal(await evaluate('document.querySelector("[data-course-cycle]").hidden'), true);
+        await t.test('student can add, remove and submit with explicit confirmation', async () => {
+            assert.equal(await evaluate('document.querySelectorAll("[data-cycle-select] option").length'), 11);
+            assert.equal(await evaluate('document.querySelector("[data-cycle-select] option").textContent'), 'Seleccionar ciclo');
+            assert.equal(await evaluate('document.querySelector("#courses-title").textContent'), 'Cursos disponibles');
+            assert.equal(await evaluate('[...document.querySelectorAll("[data-cycle-select] option")].slice(1).map(el => el.textContent.split(" · ")[0]).join(",")'), 'Ciclo I,Ciclo II,Ciclo III,Ciclo IV,Ciclo V,Ciclo VI,Ciclo VII,Ciclo VIII,Ciclo IX,Ciclo X');
+            assert.ok((await evaluate('document.querySelector(".course-table-empty").textContent')).includes('Selecciona un ciclo'));
+            assert.equal(await evaluate('document.querySelector("[data-course-row]")'), null);
+            assert.equal(await evaluate('document.querySelector("#course-search, [data-summary]")'), null);
             assert.equal(draft.detalles.length, 0);
-            await evaluate('document.querySelector("#course-search").value="00101";document.querySelector("#course-search").dispatchEvent(new Event("input",{bubbles:true}))');
-            assert.equal(await evaluate('document.querySelector("[data-course-cycle]").hidden'), false);
-            assert.equal(await evaluate('document.querySelector("[data-course-empty]").hidden'), true);
+            requests.length = 0;
+            await evaluate('(() => { const select = document.querySelector("[data-cycle-select]"); select.value = "2"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
+            assert.ok((await evaluate('document.querySelector("[data-cycle-courses]").textContent')).includes('No tienes cursos disponibles en el ciclo II'));
+            await evaluate('(() => { const select = document.querySelector("[data-cycle-select]"); select.value = "1"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
+            assert.equal(await evaluate('document.querySelector("[data-cycle-select]").value'), '1');
+            assert.equal(await evaluate('document.querySelectorAll("[data-course-row]").length'), 1);
+            assert.equal(await evaluate('document.querySelector("[data-action=add]").classList.contains("btn-add")'), true);
+            await screenshot('student-cycle-courses');
+            assert.equal(requests.length, 0);
+            assert.equal(await evaluate('document.querySelector("[data-course-preference], [data-preference]")'), null);
+            await evaluate('window.__list=document.querySelector("[data-cycle-courses]")');
             await evaluate('document.querySelector("[data-action=add]").click()');
-            await waitFor('document.querySelector("[data-action=remove]") && !document.querySelector("#screen").hasAttribute("aria-busy")');
+            await waitFor('document.querySelector("[data-action=remove]") && document.querySelector("[data-course-status]")');
             assert.equal(draft.creditos_totales, 3);
-            await evaluate('window.__preference=document.querySelector("[data-preference]");window.__preference.value="TARDE";window.__preference.dispatchEvent(new Event("change",{bubbles:true}))');
-            await waitFor('!window.__preference.isConnected && !document.querySelector("#screen").hasAttribute("aria-busy")');
-            assert.equal(draft.detalles[0].preferencia_turno, 'TARDE');
-            assert.equal(await evaluate('document.querySelector("#course-search").value'), '00101');
+            assert.equal(draft.detalles[0].preferencia_turno, 'SIN_PREFERENCIA');
+            assert.deepEqual(requests.map(item => item.method + ' ' + item.path), ['POST /api/v1/student/pre-enrollment/courses', 'GET /api/v1/student/pre-enrollments/1']);
+            assert.equal('preferencia_turno' in requests[0].body, false);
+            assert.equal(await evaluate('window.__list.isConnected'), true);
+            assert.equal(await evaluate('document.activeElement === document.querySelector("[data-course-status]")'), true);
+            assert.ok((await evaluate('document.querySelector("[data-selection-panel]").textContent')).includes('3 / 22'));
+            assert.ok((await evaluate('document.querySelector("[data-cycle-select] option[value=\\"1\\"]").textContent')).includes('1 elegido'));
+            assert.equal(await evaluate('document.querySelector("[data-cycle-select]").value'), '1');
+            await evaluate('(() => { const select = document.querySelector("[data-cycle-select]"); select.value = "2"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
+            await evaluate('(() => { const select = document.querySelector("[data-cycle-select]"); select.value = "1"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
+            assert.equal(await evaluate('document.querySelector("[data-course-row] [data-course-status]").textContent'), 'En tu selección');
+            await evaluate('window.__list=document.querySelector("[data-cycle-courses]")');
             await screenshot('student-selection-desktop');
             await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
             assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
@@ -294,24 +356,38 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
             await evaluate('document.querySelector("[data-action=remove]").click()');
             await waitFor('document.querySelector("dialog[open]")');
             await evaluate('document.querySelector("dialog[open] button[value=confirm]").click()');
-            await waitFor('!document.querySelector("[data-action=remove]") && !document.querySelector("#screen").hasAttribute("aria-busy")');
+            await waitFor('!document.querySelector("[data-action=remove]") && document.querySelector("[data-action=add]")');
             assert.equal(draft.creditos_totales, 0);
+            assert.equal(await evaluate('window.__list.isConnected'), true);
             await evaluate('document.querySelector("[data-action=add]").click()');
-            await waitFor('document.querySelector("[data-action=remove]") && !document.querySelector("#screen").hasAttribute("aria-busy")');
-            await evaluate('document.querySelector("[data-action=review]").click()');
-            await waitFor('document.querySelector("[data-action=submit]")');
-            await screenshot('student-review-desktop');
-            await evaluate('document.querySelector("[data-action=submit]").click()');
-            await waitFor('document.querySelector("dialog[open]")');
+            await waitFor('document.querySelector("[data-action=remove]") && document.querySelector("[data-course-status]")');
+            assert.equal(await evaluate('document.querySelector("[data-action=review]")'), null);
+            assert.equal(await evaluate('document.querySelector("[data-selection-panel] [data-action=submit]").textContent'), 'Registrar prematrícula');
+            await evaluate('document.querySelector("[data-selection-panel] [data-action=submit]").click()');
+            await waitFor('document.querySelector("dialog[open] button[value=confirm]")');
             assert.equal(draft.estado, 'BORRADOR');
+            assert.ok((await evaluate('document.querySelector("dialog[open]").textContent')).includes('1 curso (3 créditos)'));
             await evaluate('document.querySelector("dialog[open] button[value=confirm]").click()');
-            await waitFor('document.querySelector("[data-action=receipt]") && !document.querySelector("#screen").hasAttribute("aria-busy")');
+            await waitFor('document.querySelector("dialog.success-modal[open]")');
             assert.equal(draft.estado, 'ENVIADA');
-            assert.equal(await evaluate('document.querySelectorAll(".steps [aria-current=step]").length'), 1);
-            await evaluate('document.querySelector("[data-action=revisions]").click()');
-            await waitFor('document.querySelector("[data-return-detail]") && document.querySelector("[data-revisions] table")');
-            await evaluate('document.querySelector("[data-return-detail]").click()');
-            await waitFor('document.querySelector(".steps")');
+            assert.ok((await evaluate('document.querySelector("dialog.success-modal[open]").textContent')).includes('Tu prematrícula se registró con éxito.'));
+            await screenshot('student-success-modal');
+            await evaluate('document.querySelector("dialog.success-modal[open] button[value=ok]").click()');
+            await waitFor('!document.querySelector("dialog[open]") && document.querySelector(".receipt-card [data-action=receipt]") && !document.querySelector("#screen").hasAttribute("aria-busy")');
+            assert.ok((await evaluate('document.querySelector(".receipt-card [data-action=receipt]").textContent')).includes('Generar constancia PDF'));
+            assert.equal(await evaluate('document.activeElement === document.querySelector(".receipt-card [data-action=receipt]")'), true);
+            await screenshot('student-registered-desktop');
+            assert.equal(await evaluate('document.querySelector(".steps")'), null);
+            await evaluate('window.__opened=null;window.__realOpen=window.open;window.open=()=>({closed:false,opener:{},document:document.implementation.createHTMLDocument(""),location:{replace:url=>{window.__opened=url;}},close(){}})');
+            await evaluate('document.querySelector("[data-action=receipt]").click()');
+            await waitFor('window.__opened');
+            assert.ok((await evaluate('window.__opened')).startsWith('blob:'));
+            await evaluate('window.open=()=>null');
+            await evaluate('document.querySelector("[data-action=receipt]").click()');
+            await waitFor('document.querySelector("dialog[open] [data-open-pdf]")');
+            assert.ok((await evaluate('document.querySelector("dialog[open] [data-open-pdf]").getAttribute("href")')).startsWith('blob:'));
+            await evaluate('document.querySelector("dialog[open] [data-close]").click();window.open=window.__realOpen');
+            assert.equal(await evaluate('document.querySelector("#screen [data-action=revisions], #screen [data-action=correction]")'), null);
         });
 
         await t.test('secretary can navigate every coordinator module without JavaScript failures', async () => {

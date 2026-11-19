@@ -24,7 +24,9 @@ export class ApiError extends Error {
     }
 }
 const pendingWrites = new Set();
-export async function api(path, { method = 'GET', body, query, signal, download = false, filename } = {}) {
+export async function api(path, { method = 'GET', body, query, signal, download = false, filename, blob = false } = {}) {
+    // blob: true devuelve el archivo como Blob (sin descargarlo), p. ej. para abrir un PDF en una pestaña nueva.
+    const file = download || blob;
     method = method.toUpperCase();
     const url = new URL('/api/v1' + path, window.location.origin);
     Object.entries(query || {}).forEach(([key, value]) => {
@@ -35,7 +37,7 @@ export async function api(path, { method = 'GET', body, query, signal, download 
     if (isWrite && pendingWrites.has(key)) throw new ApiError('Esta operación ya está en curso.', 409);
     if (isWrite) pendingWrites.add(key);
     try {
-        const headers = { Accept: download ? 'application/pdf, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv, application/json' : 'application/json' };
+        const headers = { Accept: file ? 'application/pdf, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv, application/json' : 'application/json' };
         const token = auth.token();
         if (token) headers.Authorization = 'Bearer ' + token;
         const multipart = body instanceof FormData;
@@ -58,8 +60,9 @@ export async function api(path, { method = 'GET', body, query, signal, download 
             const fallback = { 401: 'Credenciales incorrectas o sesión vencida.', 403: 'No tienes permiso para realizar esta operación.', 404: 'El recurso no está disponible.', 409: 'La información cambió. Actualiza y vuelve a revisar.', 413: 'El archivo supera el tamaño permitido por el servidor.', 422: 'Revisa los datos y las reglas indicadas.', 429: 'Demasiadas solicitudes. Espera antes de volver a intentar.' };
             throw new ApiError(payload?.message || fallback[response.status] || 'No se pudo completar la operación.', response.status, payload || {}, response.headers);
         }
-        if (download) {
+        if (file) {
             if (isJson || !/application\/(pdf|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)|text\/csv|application\/octet-stream/.test(contentType)) throw new ApiError('El servidor no devolvió el archivo esperado.', response.status, payload || {});
+            if (blob) return await response.blob();
             const disposition = response.headers.get('Content-Disposition') || '';
             const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)/i);
             let name = filename || 'descarga';
