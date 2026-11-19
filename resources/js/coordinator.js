@@ -181,15 +181,15 @@ async function dashboard(ctx, user) {
         syncModalRanges();
     });
 
-    const paintChart = cycles => {
+    const paintChart = data => {
         const { lowMax, mediumMax } = thresholds;
-        const total = cycles.reduce((sum, cycle) => sum + Number(cycle.registrada || 0), 0);
+        const { totalStudents, cycles } = data;
         const max = Math.max(mediumMax + 1, ...cycles.map(cycle => Number(cycle.registrada || 0)));
 
         totalTarget.innerHTML =
             '<article class="stat-card" style="display:flex;align-items:center;justify-content:space-between;gap:1.25rem;padding:0.65rem 1.1rem;min-width:220px;">' +
-            '<p style="margin:0;font-size:0.875rem;">Total matriculados</p>' +
-            '<strong style="font-size:1.5rem;line-height:1;">' + total.toLocaleString('es-PE') + '</strong>' +
+            '<p style="margin:0;font-size:0.875rem;">Total de estudiantes prematriculados</p>' +
+            '<strong style="font-size:1.5rem;line-height:1;">' + totalStudents.toLocaleString('es-PE') + '</strong>' +
             '</article>';
 
         const legend =
@@ -204,7 +204,7 @@ async function dashboard(ctx, user) {
             '</div>';
 
         const chart =
-            '<div class="cycle-chart" role="img" aria-label="Alumnos matriculados por ciclo" style="display:flex;align-items:flex-end;gap:0.85rem;padding-top:1rem;">' +
+            '<div class="cycle-chart" role="img" aria-label="Alumnos prematriculados por ciclo" style="display:flex;align-items:flex-end;gap:0.85rem;padding-top:1rem;">' +
             cycles.map(cycle => {
                 const value = Number(cycle.registrada || 0);
                 const barStyle = getCycleBarStyle(value, thresholds);
@@ -256,56 +256,42 @@ async function dashboard(ctx, user) {
         if (lastCyclesData) paintChart(lastCyclesData);
     });
 
+
     const renderDemand = async periodId => {
         const ticket = ++demandTicket;
+
         if (!periodId) {
             totalTarget.innerHTML = '';
             demandTarget.innerHTML = '<p class="empty">No hay períodos disponibles.</p>';
             return;
         }
-        if (!curriculumCourses) {
-            const first = await ctx.request('/courses', { query: { page: 1, per_page: 100 } });
-            curriculumCourses = [...(first.data || [])];
-            for (let page = 2; page <= (first.meta?.last_page || 1); page++) {
-                const next = await ctx.request('/courses', { query: { page, per_page: 100 } });
-                curriculumCourses.push(...(next.data || []));
-            }
-        }
-        const demandPath = '/coordinator/academic-periods/' + periodId + '/demand';
-        const firstDemand = await ctx.request(demandPath, { query: { per_page: 100, page: 1 } });
-        const demandCourses = [...(firstDemand.data?.cursos || firstDemand.data || [])];
-        const lastDemandPage = firstDemand.data?.paginacion?.last_page || firstDemand.meta?.last_page || 1;
-        for (let page = 2; page <= lastDemandPage; page++) {
-            const next = await ctx.request(demandPath, { query: { per_page: 100, page } });
-            demandCourses.push(...(next.data?.cursos || next.data || []));
-        }
 
-        const counts = new Map(demandCourses.map(course => [
-            String(course.course_id ?? course.id),
-            Number(course.registrada ?? course.demanda_registrada ?? course.total ?? 0),
-        ]));
+        const summaryPath = '/coordinator/academic-periods/' + periodId + '/summary';
 
-        const byCycle = new Map();
-        curriculumCourses.forEach(course => {
-            const courses = byCycle.get(course.ciclo) || [];
-            courses.push({ ...course, registrada: counts.get(String(course.id)) || 0 });
-            byCycle.set(course.ciclo, courses);
-        });
-
-        const groups = [...byCycle.entries()]
-            .sort(([a], [b]) => Number(a) - Number(b))
-            .map(([cycle, courses]) => ({ cycle, courses }));
-
-        const cycles = groups.map(group => ({
-            ciclo: group.cycle,
-            registrada: group.courses.reduce((sum, course) => sum + Number(course.registrada || 0), 0),
-        }));
+        const summaryResponse = await ctx.request(summaryPath);
 
         if (!ctx.current() || ticket !== demandTicket) return;
 
-        lastCyclesData = cycles;
-        paintChart(cycles);
+        const summary = summaryResponse.data || {};
+
+        // El total global cuenta estudiantes únicos en todo el período.
+        const totalStudents = Number(summary.total_estudiantes || 0);
+
+        // Los datos del gráfico ya vienen agrupados por ciclo
+        // y cuentan estudiantes únicos dentro de cada ciclo.
+        const cycles = (summary.ciclos || []).map(cycle => ({
+            ciclo: cycle.ciclo,
+            registrada: Number(cycle.estudiantes_prematriculados || 0),
+        }));
+
+        lastCyclesData = {
+            totalStudents,
+            cycles,
+        };
+
+        paintChart(lastCyclesData);
     };
+
 
     const periodFilter = content.querySelector('[data-demand-period]');
     if (periodFilter) {

@@ -40,28 +40,39 @@ class AcademicDemand
 
         return $query->orderBy($filters['sort'] ?? 'course_id', $filters['direction'] ?? 'asc')->orderBy('c.id');
     }
-
     /**
-     * Resumen por ciclo: devuelve únicamente ciclo y estudiantes prematriculados.
+     * Resumen por ciclo y total de estudiantes únicos del período.
      *
      * @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
     public function summary(AcademicPeriod $period, array $filters = []): array
     {
-        $cycles = $this->selections($period, $filters)
+        $selection = $this->selections($period, $filters);
+
+        // Total de estudiantes únicos en todo el período.
+        $totalStudents = (clone $selection)
+            ->selectRaw('COUNT(DISTINCT s.student_id)::integer AS total_estudiantes')
+            ->value('total_estudiantes');
+
+        // Estudiantes únicos agrupados por ciclo.
+        $cycles = (clone $selection)
             ->select('c.ciclo')
-            ->selectRaw('COUNT(DISTINCT s.student_id)::integer AS estudiantes_prematriculados')
-            ->selectRaw('COUNT(DISTINCT s.student_id)::integer AS alumnos_enviaron')
+            ->selectRaw(
+                'COUNT(DISTINCT s.student_id)::integer AS estudiantes_prematriculados'
+            )
             ->groupBy('c.ciclo')
-            ->orderBy('c.ciclo');
+            ->orderBy('c.ciclo')
+            ->get();
 
         return [
             'academic_period_id' => $period->id,
             'advertencia' => self::NOTICE,
-            'ciclos' => $cycles->get()->all(),
+            'total_estudiantes' => (int) $totalStudents,
+            'ciclos' => $cycles->all(),
         ];
     }
+
 
     /** The current submitted revision survives an unsubmitted correction draft. */
     private function registered(AcademicPeriod $period): Builder

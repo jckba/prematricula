@@ -1,12 +1,12 @@
-
-# Etapa 1: Compilar recursos frontend
+# ==========================================
+# Etapa 1: Construcción del frontend
+# ==========================================
 FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
 COPY package*.json ./
-
-RUN npm install
+RUN npm ci
 
 COPY resources/ ./resources/
 COPY vite.config.* ./
@@ -15,7 +15,9 @@ COPY public/ ./public/
 RUN npm run build
 
 
+# ==========================================
 # Etapa 2: Aplicación Laravel
+# ==========================================
 FROM php:8.4-apache
 
 # Dependencias del sistema y extensiones PHP
