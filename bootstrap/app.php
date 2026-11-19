@@ -44,10 +44,11 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'token', 'access_token']);
 
-        $exceptions->report(function (QueryException $exception): bool {
+        $exceptions->report(function (QueryException $e): bool {
             Log::error('Error de base de datos.', [
-                'connection' => $exception->connectionName,
-                'sqlstate' => $exception->errorInfo[0] ?? null,
+                'connection' => $e->getConnectionName(),
+                'sqlstate' => $e->getCode(),
+                'detail' => $e->getMessage(), // <-- Te dirá el nombre exacto de la tabla
             ]);
 
             return false;

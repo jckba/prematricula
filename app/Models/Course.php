@@ -56,12 +56,6 @@ class Course extends Model
         return $this->hasMany(AcademicHistory::class);
     }
 
-    /** @return HasMany<TeachingAssignment, $this> */
-    public function teachingAssignments(): HasMany
-    {
-        return $this->hasMany(TeachingAssignment::class);
-    }
-
     /** @return BelongsToMany<PreEnrollmentRevision, $this> */
     public function preEnrollmentRevisions(): BelongsToMany
     {

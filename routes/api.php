@@ -10,9 +10,6 @@ use App\Http\Controllers\Api\Coordinator\AccountController;
 use App\Http\Controllers\Api\Coordinator\CurriculumController;
 use App\Http\Controllers\Api\Coordinator\PreEnrollmentController as CoordinatorPreEnrollmentController;
 use App\Http\Controllers\Api\Coordinator\PreEnrollmentWindowController;
-use App\Http\Controllers\Api\Coordinator\TeacherController;
-use App\Http\Controllers\Api\Coordinator\TeachingAssignmentController;
-use App\Http\Controllers\Api\Coordinator\TeachingLoadController;
 use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\PreEnrollmentRevisionController;
 use App\Http\Controllers\Api\Student\PreEnrollmentController;
@@ -117,14 +114,6 @@ Route::prefix('v1')->group(function () {
             ->group(function () {
 
                 Route::post('academic-periods', [AcademicPeriodController::class, 'store']);
-                Route::apiResource('teachers', TeacherController::class);
-                Route::get('teaching-assignments/{assignment}/history', [TeachingAssignmentController::class, 'history'])->withTrashed();
-                Route::apiResource('teaching-assignments', TeachingAssignmentController::class)->parameters(['teaching-assignments' => 'assignment']);
-                Route::get('academic-periods/{period}/teaching-load', [TeachingLoadController::class, 'summary']);
-                Route::get('academic-periods/{period}/teaching-load/teachers', [TeachingLoadController::class, 'teachers']);
-                Route::get('academic-periods/{period}/teaching-load/teachers/{teacher}', [TeachingLoadController::class, 'teacher']);
-                Route::get('academic-periods/{period}/teaching-load/courses', [TeachingLoadController::class, 'courses']);
-                Route::get('academic-periods/{period}/teaching-load/courses/{course}', [TeachingLoadController::class, 'course']);
                 Route::patch('academic-periods/{period}', [AcademicPeriodController::class, 'update']);
                 Route::delete('academic-periods/{period}', [AcademicPeriodController::class, 'destroy']);
                 Route::get('students', [AcademicConsultationController::class, 'index']);

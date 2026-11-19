@@ -3,9 +3,11 @@
 namespace App\UseCases\AcademicPeriods;
 
 use App\Enums\AcademicPeriodStatus;
+use App\Enums\PreEnrollmentWindowType;
 use App\Models\AcademicPeriod;
 use App\Models\User;
 use App\Services\AcademicProcessLock;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -21,7 +23,10 @@ class ManageAcademicPeriod
             $current = $period === null ? null : AcademicPeriod::query()->lockForUpdate()->findOrFail($period->id);
             $base = $current?->only(['codigo', 'estado']) ?? [];
             if ($current !== null) {
-                $base += ['fecha_inicio' => $current->fecha_inicio->toDateString(), 'fecha_fin' => $current->fecha_fin->toDateString()];
+                $base += [
+                    'fecha_inicio' => $current->fecha_inicio->toDateString(),
+                    'fecha_fin' => $current->fecha_fin->toDateString(),
+                ];
             }
             $merged = array_replace($base, $data);
             Validator::make($merged, [
@@ -31,18 +36,45 @@ class ManageAcademicPeriod
                 'estado' => ['required', Rule::enum(AcademicPeriodStatus::class)],
             ])->validate();
 
-            if ($current !== null && ($current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists() || $current->teachingAssignments()->withTrashed()->exists()) &&
+            if ($current !== null && ($current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists()) &&
                 ($current->codigo !== $merged['codigo'] || $current->fecha_inicio->toDateString() !== $merged['fecha_inicio'] || $current->fecha_fin->toDateString() !== $merged['fecha_fin'])) {
                 throw ValidationException::withMessages(['period' => 'Un período referenciado conserva código y fechas de clases. Puede administrar su estado y añadir ventanas.']);
             }
 
-            if ($current === null) {
-                return AcademicPeriod::create($merged + ['created_by' => $actor->id, 'updated_by' => $actor->id]);
+            $tz = config('academic.timezone');
+            $nowLocal = CarbonImmutable::now($tz);
+
+            $targetStatus = $merged['estado'] instanceof AcademicPeriodStatus
+                ? $merged['estado']
+                : AcademicPeriodStatus::from((string) $merged['estado']);
+
+            if ($targetStatus === AcademicPeriodStatus::PREMATRICULA) {
+                $merged['fecha_inicio_prematricula'] ??= $current?->fecha_inicio_prematricula ?? $nowLocal->toDateString();
+                $merged['fecha_fin_prematricula'] ??= $current?->fecha_fin_prematricula ?? $merged['fecha_fin'];
             }
 
-            $current->fill($merged + ['updated_by' => $actor->id])->save();
+            if ($current === null) {
+                $saved = AcademicPeriod::create($merged + ['created_by' => $actor->id, 'updated_by' => $actor->id]);
+            } else {
+                $current->fill($merged + ['updated_by' => $actor->id])->save();
+                $saved = $current->refresh();
+            }
 
-            return $current->refresh();
+            if ($saved->estado === AcademicPeriodStatus::PREMATRICULA && ! $saved->windows()->exists()) {
+                $endLocal = CarbonImmutable::parse($saved->fecha_fin_prematricula, $tz)->endOfDay();
+
+                $saved->windows()->create([
+                    'tipo' => PreEnrollmentWindowType::ORDINARIA,
+                    'fecha_inicio' => $nowLocal->utc(),
+                    'fecha_fin' => $endLocal->utc(),
+                    'motivo' => 'Apertura automática al habilitar período en prematrícula',
+                    'created_by' => $actor->id,
+                    'timezone' => $tz,
+                    'origen' => 'SISTEMA',
+                ]);
+            }
+
+            return $saved;
         });
     }
 
@@ -50,7 +82,7 @@ class ManageAcademicPeriod
     {
         $this->lock->transaction(function () use ($period): void {
             $current = AcademicPeriod::query()->lockForUpdate()->findOrFail($period->id);
-            if ($current->windows()->exists() || $current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists() || $current->teachingAssignments()->withTrashed()->exists()) {
+            if ($current->windows()->exists() || $current->academicHistories()->exists() || $current->preEnrollmentRequests()->exists()) {
                 abort(409, 'No se puede eliminar un período referenciado.');
             }
             $current->delete();

@@ -32,14 +32,7 @@ class CurriculumCatalog
             DB::select('SELECT pg_advisory_xact_lock(?)', [82640101]);
             $courses = Course::query()->orderBy('id')->lockForUpdate()->get();
             $courses->load('prerequisites');
-            $courses->loadCount(['academicHistories', 'preEnrollmentDetails', 'preEnrollmentRevisions',
-                'teachingAssignments' => function (Builder|Relation $assignments): Builder {
-                    if ($assignments instanceof Relation) {
-                        $assignments = $assignments->getQuery();
-                    }
-
-                    return $assignments->withoutGlobalScope(SoftDeletingScope::class);
-                }]);
+            $courses->loadCount(['academicHistories', 'preEnrollmentDetails', 'preEnrollmentRevisions']);
 
             return $operation($courses);
         }, 3);
@@ -62,7 +55,7 @@ class CurriculumCatalog
 
     public function isProtected(Course $course): bool
     {
-        return $course->academic_histories_count > 0 || $course->pre_enrollment_details_count > 0 || $course->pre_enrollment_revisions_count > 0 || $course->teaching_assignments_count > 0;
+        return $course->academic_histories_count > 0 || $course->pre_enrollment_details_count > 0 || $course->pre_enrollment_revisions_count > 0;
     }
 
     /**

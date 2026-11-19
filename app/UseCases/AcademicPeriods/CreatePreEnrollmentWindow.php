@@ -23,10 +23,11 @@ class CreatePreEnrollmentWindow
             if (! in_array($period->estado, [AcademicPeriodStatus::PLANIFICACION, AcademicPeriodStatus::PREMATRICULA], true)) {
                 throw ValidationException::withMessages(['period' => 'El período no admite nuevas ventanas de prematrícula.']);
             }
-            $start = CarbonImmutable::parse($data['fecha_inicio'], config('academic.timezone'))->utc();
-            $end = CarbonImmutable::parse($data['fecha_fin'], config('academic.timezone'))->utc();
-            if ($start->setTimezone(config('academic.timezone'))->format('Y-m-d H:i:s') !== $data['fecha_inicio'] ||
-                $end->setTimezone(config('academic.timezone'))->format('Y-m-d H:i:s') !== $data['fecha_fin']) {
+            $tz = config('academic.timezone');
+            $start = CarbonImmutable::parse($data['fecha_inicio'], $tz)->utc();
+            $end = CarbonImmutable::parse($data['fecha_fin'], $tz)->utc();
+            if ($start->setTimezone($tz)->format('Y-m-d H:i:s') !== $data['fecha_inicio'] ||
+                $end->setTimezone($tz)->format('Y-m-d H:i:s') !== $data['fecha_fin']) {
                 throw ValidationException::withMessages(['fecha_inicio' => 'La fecha no existe en la zona horaria institucional.']);
             }
             if ($end->lte($start)) {
@@ -45,10 +46,19 @@ class CreatePreEnrollmentWindow
                 throw ValidationException::withMessages(['fecha_inicio' => 'Las ventanas de un período no pueden solaparse.']);
             }
             $window = $period->windows()->create([
-                ...$data, 'fecha_inicio' => $start, 'fecha_fin' => $end,
-                'created_by' => $actor->id, 'timezone' => config('academic.timezone'), 'origen' => 'API',
+                ...$data,
+                'fecha_inicio' => $start,
+                'fecha_fin' => $end,
+                'created_by' => $actor->id,
+                'timezone' => $tz,
+                'origen' => 'API',
             ]);
-            $period->update(['updated_by' => $actor->id]);
+
+            $period->update([
+                'fecha_inicio_prematricula' => $period->fecha_inicio_prematricula ?? $start->setTimezone($tz)->toDateString(),
+                'fecha_fin_prematricula' => $end->setTimezone($tz)->toDateString(),
+                'updated_by' => $actor->id,
+            ]);
 
             return $window;
         });

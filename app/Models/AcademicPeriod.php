@@ -50,12 +50,6 @@ class AcademicPeriod extends Model
         return $this->hasMany(PreEnrollmentWindow::class);
     }
 
-    /** @return HasMany<TeachingAssignment, $this> */
-    public function teachingAssignments(): HasMany
-    {
-        return $this->hasMany(TeachingAssignment::class);
-    }
-
     /** @return HasMany<AcademicHistory, $this> */
     public function academicHistories(): HasMany
     {
