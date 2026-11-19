@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Services;
 
@@ -11,7 +12,8 @@ class AcademicDemand
 {
     public const NOTICE = 'Estimaciones de demanda de prematrícula; no constituyen matrícula definitiva.';
 
-    /** @param array<string, mixed> $filters
+    /**
+     * @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
     public function forPeriod(AcademicPeriod $period, array $filters = []): array
@@ -20,8 +22,12 @@ class AcademicDemand
         $pagination = $page->toArray();
         unset($pagination['data']);
 
-        return ['academic_period_id' => $period->id, 'advertencia' => self::NOTICE,
-            'cursos' => $page->items(), 'paginacion' => $pagination];
+        return [
+            'academic_period_id' => $period->id,
+            'advertencia' => self::NOTICE,
+            'cursos' => $page->items(),
+            'paginacion' => $pagination,
+        ];
     }
 
     /** @param array<string, mixed> $filters */
@@ -35,25 +41,26 @@ class AcademicDemand
         return $query->orderBy($filters['sort'] ?? 'course_id', $filters['direction'] ?? 'asc')->orderBy('c.id');
     }
 
-    /** @param array<string, mixed> $filters
+    /**
+     * Resumen por ciclo: devuelve únicamente ciclo y estudiantes prematriculados.
+     *
+     * @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
     public function summary(AcademicPeriod $period, array $filters = []): array
     {
-        $totals = $this->registered($period)->selectRaw('COUNT(DISTINCT p.student_id)::integer AS alumnos_enviaron')
-            ->selectRaw("COUNT(DISTINCT p.student_id) FILTER (WHERE p.correction_window_id IS NOT NULL OR v.estado = 'REQUIERE_AJUSTE')::integer AS alumnos_requieren_ajuste")
-            ->selectRaw('COUNT(DISTINCT p.student_id) FILTER (WHERE v.id IS NULL)::integer AS alumnos_sin_validacion')->first();
-        $cycles = $this->selections($period, $filters)->select('c.ciclo')->groupBy('c.ciclo')->orderBy('c.ciclo');
-        $this->addCounts($cycles);
-        $cycles->selectRaw('COUNT(DISTINCT s.student_id)::integer AS alumnos_enviaron');
+        $cycles = $this->selections($period, $filters)
+            ->select('c.ciclo')
+            ->selectRaw('COUNT(DISTINCT s.student_id)::integer AS estudiantes_prematriculados')
+            ->selectRaw('COUNT(DISTINCT s.student_id)::integer AS alumnos_enviaron')
+            ->groupBy('c.ciclo')
+            ->orderBy('c.ciclo');
 
-        return ['academic_period_id' => $period->id, 'advertencia' => self::NOTICE,
-            'alumnos_enviaron' => $totals->alumnos_enviaron,
-            'alumnos_requieren_ajuste' => $totals->alumnos_requieren_ajuste,
-            'alumnos_sin_validacion' => $totals->alumnos_sin_validacion,
-            'poblacion_academica' => null, 'alumnos_no_enviaron' => null,
-            'fuente_poblacion' => 'No se dispone de un padrón académico por período.',
-            'ciclos' => $cycles->get()->all()];
+        return [
+            'academic_period_id' => $period->id,
+            'advertencia' => self::NOTICE,
+            'ciclos' => $cycles->get()->all(),
+        ];
     }
 
     /** The current submitted revision survives an unsubmitted correction draft. */
@@ -109,7 +116,9 @@ class AcademicDemand
             ->selectRaw("CASE WHEN p.correction_window_id IS NOT NULL OR v.estado = 'REQUIERE_AJUSTE' THEN 'REQUIERE_AJUSTE'
                 WHEN v.estado IN ('VALIDA', 'PENDIENTE_RESULTADOS') AND validation.estado IN ('VALIDA', 'PENDIENTE_RESULTADOS', 'REQUIERE_AJUSTE')
                 THEN validation.estado ELSE 'SIN_VALIDACION' END AS estado_validacion");
+
         $query = DB::query()->fromSub($selection, 's')->join('courses as c', 'c.id', '=', 's.course_id');
+
         if (isset($filters['ciclo'])) {
             $query->where('c.ciclo', $filters['ciclo']);
         }
@@ -117,12 +126,12 @@ class AcademicDemand
             $query->where('c.id', $filters['course_id']);
         }
         if (isset($filters['q'])) {
-            $pattern = '%'.addcslashes($filters['q'], '\\%_').'%';
+            $pattern = '%' . addcslashes((string) $filters['q'], '\\%_') . '%';
             $query->where(fn (Builder $search) => $search->whereLike('c.codigo', $pattern)->orWhereLike('c.nombre', $pattern));
         }
         foreach (['estado_validacion', 'preferencia_turno'] as $field) {
             if (isset($filters[$field])) {
-                $query->where('s.'.$field, $filters[$field]);
+                $query->where('s.' . $field, $filters[$field]);
             }
         }
 
@@ -132,11 +141,19 @@ class AcademicDemand
     private function addCounts(Builder $query): void
     {
         $query->selectRaw('COUNT(*)::integer AS registrada');
-        foreach (['VALIDA' => 'valida', 'PENDIENTE_RESULTADOS' => 'pendiente_resultados',
-            'REQUIERE_AJUSTE' => 'requiere_ajuste', 'SIN_VALIDACION' => 'sin_validacion'] as $state => $field) {
+        foreach ([
+                     'VALIDA' => 'valida',
+                     'PENDIENTE_RESULTADOS' => 'pendiente_resultados',
+                     'REQUIERE_AJUSTE' => 'requiere_ajuste',
+                     'SIN_VALIDACION' => 'sin_validacion',
+                 ] as $state => $field) {
             $query->selectRaw("COUNT(*) FILTER (WHERE s.estado_validacion = ?)::integer AS {$field}", [$state]);
         }
-        foreach (['MANANA' => 'manana', 'TARDE' => 'tarde', 'SIN_PREFERENCIA' => 'sin_preferencia'] as $preference => $field) {
+        foreach ([
+                     'MANANA' => 'manana',
+                     'TARDE' => 'tarde',
+                     'SIN_PREFERENCIA' => 'sin_preferencia',
+                 ] as $preference => $field) {
             $query->selectRaw("COUNT(*) FILTER (WHERE s.preferencia_turno = ?)::integer AS {$field}", [$preference]);
         }
     }
