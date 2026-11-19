@@ -91,13 +91,15 @@ export async function demand(ctx) {
     if (!periods.length) { shell(ctx, 'Demanda académica', 'Primero registre un período académico.'); return; }
     const fields = [periodFilter(periods, true), text('q', 'Código o nombre de curso', { minlength: 2 }), number('ciclo', 'Ciclo'),
         select('estado_validacion', 'Validación académica', ['VALIDA', 'PENDIENTE_RESULTADOS', 'REQUIERE_AJUSTE', 'SIN_VALIDACION']),
-        select('preferencia_turno', 'Preferencia', ['MANANA', 'TARDE', 'SIN_PREFERENCIA']),
+        // TURNO-OCULTO: filtro por preferencia de turno oculto por ahora.
+        // select('preferencia_turno', 'Preferencia', ['MANANA', 'TARDE', 'SIN_PREFERENCIA']),
         select('sort', 'Ordenar por', ['course_id', 'codigo', 'nombre', 'ciclo', 'creditos', 'registrada', 'valida', 'pendiente_resultados', 'requiere_ajuste']),
         select('direction', 'Dirección', ['asc', 'desc'])];
     let query = { academic_period_id: String(periods[0][0]) }, page = 1, ticket = 0;
-    shell(ctx, 'Demanda académica estimada', 'Las preferencias declaradas no son horarios ni grupos. Las cifras no constituyen matrícula definitiva.',
+    shell(ctx, 'Demanda académica estimada', 'Las cifras no constituyen matrícula definitiva.' /* TURNO-OCULTO: antes decía también "Las preferencias declaradas no son horarios ni grupos." */,
         filterForm(fields, query, button('Exportar CSV', 'export')));
-    const columns = [['Código', 'codigo'], ['Curso', 'nombre'], ['Ciclo', 'ciclo'], ['Créditos', 'creditos'], ['Registrada', 'registrada'], ['Válida', 'valida'], ['Pendiente', 'pendiente_resultados'], ['Requiere ajuste', 'requiere_ajuste'], ['Sin validación', 'sin_validacion'], ['Mañana', 'manana'], ['Tarde', 'tarde'], ['Sin preferencia', 'sin_preferencia']];
+    const columns = [['Código', 'codigo'], ['Curso', 'nombre'], ['Ciclo', 'ciclo'], ['Créditos', 'creditos'], ['Registrada', 'registrada'], ['Válida', 'valida'], ['Pendiente', 'pendiente_resultados'], ['Requiere ajuste', 'requiere_ajuste'], ['Sin validación', 'sin_validacion']];
+    // TURNO-OCULTO: columnas ['Mañana', 'manana'], ['Tarde', 'tarde'], ['Sin preferencia', 'sin_preferencia'] ocultas por ahora.
     const load = async () => {
         const sequence = ++ticket;
         const { academic_period_id: period, ...filters } = query;
@@ -128,7 +130,7 @@ export async function demand(ctx) {
             await busy(trigger, () => ctx.request('/coordinator/academic-periods/' + period + '/demand/export', { query: filters, download: true, filename: 'demanda-' + period + '.csv' }));
         }
         if (trigger.dataset.action === 'interested') await pagedDetail(ctx, 'Estudiantes interesados', '/coordinator/academic-periods/' + period + '/demand/courses/' + trigger.dataset.id + '/students',
-            [['Código', 'codigo_universitario'], ['Nombres', 'nombres'], ['Apellidos', 'apellidos'], ['Revisión', 'revision_id'], ['Preferencia', 'preferencia_turno', row => esc(label(row.preferencia_turno))], ['Validación', 'estado_validacion', row => badge(row.estado_validacion)]],
+            [['Código', 'codigo_universitario'], ['Nombres', 'nombres'], ['Apellidos', 'apellidos'], ['Revisión', 'revision_id'], /* TURNO-OCULTO: ['Preferencia', 'preferencia_turno', row => esc(label(row.preferencia_turno))], */ ['Validación', 'estado_validacion', row => badge(row.estado_validacion)]],
             { estado_validacion: filters.estado_validacion, preferencia_turno: filters.preferencia_turno });
     });
     await load();

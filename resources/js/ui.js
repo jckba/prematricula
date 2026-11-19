@@ -1,3 +1,5 @@
+import { api } from './api';
+
 export const $ = (selector, root = document) => root.querySelector(selector);
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const labels = { ESTUDIANTE: 'Estudiante', COORDINADOR: 'Coordinación', DIRECTOR_ESCUELA: 'Dirección de escuela', SECRETARIA: 'Secretaría', MANANA: 'Mañana', TARDE: 'Tarde', SIN_PREFERENCIA: 'Sin preferencia', ACTIVO: 'Activo', INACTIVO: 'Inactivo', BORRADOR: 'Borrador', ENVIADA: 'Enviada', APROBADA: 'Aprobada (histórico)', RECHAZADA: 'Rechazada (histórico)', VALIDA: 'Válida', PENDIENTE_RESULTADOS: 'Pendiente de resultados', REQUIERE_AJUSTE: 'Requiere ajuste', SIN_VALIDACION: 'Sin validación', PLANIFICACION: 'Planificación', PREMATRICULA: 'Prematrícula', EN_CURSO: 'En curso', CERRADO: 'Cerrado', APROBADO: 'Aprobado', DESAPROBADO: 'Desaprobado', RETIRADO: 'Retirado', ORDINARIA: 'Ordinaria', EXTRAORDINARIA: 'Extraordinaria' };
@@ -12,10 +14,28 @@ export function badge(value) {
     const tone = ['ACTIVO', 'VALIDA', 'APROBADO', 'ENVIADA'].includes(value) ? 'success' : ['INACTIVO', 'REQUIERE_AJUSTE', 'DESAPROBADO', 'RECHAZADA'].includes(value) ? 'danger' : 'info';
     return '<span class="badge badge-' + tone + '">' + escape(label(value)) + '</span>';
 }
+// Mensajes de estado del sistema. En el portal (#flash con data-toast) se muestran como aviso flotante:
+// los de éxito/info/advertencia se ocultan solos a los 2 s (se pausa al pasar el mouse o enfocar);
+// los de error se quedan hasta cerrarlos, para dar tiempo a leer la causa.
+const FLASH_MS = 2000;
+let flashTimer = null;
 export function flash(message, type = 'success') {
     const el = $('#flash'); if (!el) return;
-    el.className = 'notice notice-' + type; el.textContent = message; el.hidden = false;
+    clearTimeout(flashTimer);
+    const toast = el.hasAttribute('data-toast');
+    el.className = 'notice notice-' + type + (toast ? ' toast' : '');
     el.setAttribute('role', type === 'danger' ? 'alert' : 'status');
+    if (!toast) { el.textContent = message; el.hidden = false; return; }
+    el.innerHTML = '<span class="toast-icon" aria-hidden="true">' + (type === 'success' ? '✓' : type === 'danger' ? '!' : 'i') + '</span>' +
+        '<span class="toast-text"></span><button type="button" class="toast-close" aria-label="Cerrar mensaje">×</button>';
+    el.querySelector('.toast-text').textContent = message;
+    el.querySelector('.toast-close').onclick = () => { clearTimeout(flashTimer); el.hidden = true; };
+    el.hidden = false;
+    if (type === 'danger') return;
+    const hide = () => { flashTimer = setTimeout(() => { el.hidden = true; }, FLASH_MS); };
+    el.onmouseenter = el.onfocusin = () => clearTimeout(flashTimer);
+    el.onmouseleave = el.onfocusout = () => { if (!el.hidden) { clearTimeout(flashTimer); hide(); } };
+    hide();
 }
 export function showError(error, scope = document) {
     if (error.name === 'AbortError') return;
@@ -39,10 +59,10 @@ export function showError(error, scope = document) {
 }
 export async function busy(button, action) {
     if (button?.disabled) return;
-    const text = button?.textContent;
+    const content = button?.innerHTML; // conserva iconos al restaurar
     if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
     try { return await action(); } catch (error) { showError(error); }
-    finally { if (button?.isConnected) { button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = text; } }
+    finally { if (button?.isConnected) { button.disabled = false; button.removeAttribute('aria-busy'); button.innerHTML = content; } }
 }
 export function heading(title, description = '') {
     return '<div class="page-heading"><h1 tabindex="-1">' + escape(title) + '</h1><p>' + escape(description) + '</p></div>';
@@ -62,6 +82,46 @@ export async function confirmAction(title, text, proceed = 'Confirmar') {
     dialog.innerHTML = '<form method="dialog"><h2>' + escape(title) + '</h2><p>' + escape(text) + '</p><div class="toolbar"><button value="cancel" class="btn btn-secondary" autofocus>Cancelar</button><button value="confirm" class="btn">' + escape(proceed) + '</button></div></form>';
     dialog.setAttribute('aria-label', title); document.body.append(dialog); dialog.showModal();
     return new Promise(resolve => dialog.addEventListener('close', () => { const result = dialog.returnValue === 'confirm'; dialog.remove(); resolve(result); }, { once: true }));
+}
+/** Modal de éxito con un check animado. Devuelve una promesa que se resuelve al cerrarlo (Aceptar, Esc). */
+export function successDialog(title, text, detailText = '') {
+    const dialog = document.createElement('dialog'); dialog.className = 'modal success-modal';
+    dialog.setAttribute('aria-labelledby', 'success-title'); dialog.setAttribute('aria-describedby', 'success-text');
+    dialog.innerHTML = '<form method="dialog">' +
+        '<svg class="success-check" viewBox="0 0 52 52" aria-hidden="true"><circle class="success-check-circle" cx="26" cy="26" r="24"/><path class="success-check-mark" d="M15 27l7 7 15-15"/></svg>' +
+        '<h2 id="success-title">' + escape(title) + '</h2><p id="success-text">' + escape(text) + '</p>' +
+        (detailText ? '<p class="success-detail">' + escape(detailText) + '</p>' : '') +
+        '<button value="ok" class="btn" autofocus>Aceptar</button></form>';
+    document.body.append(dialog); dialog.showModal();
+    return new Promise(resolve => dialog.addEventListener('close', () => { dialog.remove(); resolve(); }, { once: true }));
+}
+let lastPdfUrl = null;
+/**
+ * Abre un PDF protegido (token Bearer) en una pestaña nueva con el visor del navegador.
+ * La pestaña se abre ANTES del primer await para conservar el gesto del clic y evitar el bloqueo de ventanas emergentes;
+ * luego se descarga el archivo con fetch, se crea un blob URL y se carga en esa pestaña.
+ * Si el navegador bloquea la pestaña, se muestra un botón "Abrir constancia" (un clic nuevo sí se permite).
+ */
+export async function openPdf(path, title = 'Constancia de prematrícula') {
+    let tab = null;
+    try { tab = window.open('', '_blank'); } catch { tab = null; }
+    if (tab) {
+        try { tab.opener = null; tab.document.title = title; tab.document.body.style.font = '16px system-ui, sans-serif'; tab.document.body.textContent = 'Cargando constancia…'; } catch { /* la pestaña sigue siendo utilizable */ }
+    }
+    let file;
+    try { file = await api(path, { blob: true }); }
+    catch (error) { if (tab && !tab.closed) tab.close(); throw error; }
+    // El blob URL se conserva mientras el portal esté abierto para que el visor pueda imprimir o descargar; se libera al abrir otro.
+    if (lastPdfUrl) URL.revokeObjectURL(lastPdfUrl);
+    lastPdfUrl = URL.createObjectURL(new Blob([file], { type: 'application/pdf' }));
+    if (tab && !tab.closed) { tab.location.replace(lastPdfUrl); return; }
+    const dialog = document.createElement('dialog'); dialog.className = 'modal';
+    dialog.setAttribute('aria-label', title);
+    dialog.innerHTML = '<h2>Tu constancia está lista</h2><p>Tu navegador bloqueó la pestaña nueva. Ábrela con este botón.</p><div class="toolbar"><button type="button" class="btn btn-secondary" data-close>Cerrar</button><a class="btn" data-open-pdf href="' + escape(lastPdfUrl) + '" target="_blank" rel="noopener">Abrir constancia</a></div>';
+    dialog.querySelector('[data-close]').onclick = () => dialog.close();
+    dialog.querySelector('[data-open-pdf]').addEventListener('click', () => setTimeout(() => dialog.close()));
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+    document.body.append(dialog); dialog.showModal();
 }
 export function detail(title, data) {
     const dialog = document.createElement('dialog'); dialog.className = 'modal modal-wide';
@@ -90,6 +150,12 @@ export function icon(name) {
         check: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 12 3 3 5-6"/>',
         credits: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 4 16 4 16 0V5M4 12v7c0 4 16 4 16 0"/>',
         arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+        "panel-close": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M16 10l-2 2 2 2"/>',
+        "panel-open": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M14 10l2 2-2 2"/>',
+        "check-circle": '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.7 2.7L16 9.8"/>',
+        chevron: '<path d="m6 9 6 6 6-6"/>',
+        external: '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>',
+        eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
         logout: '<path d="M9 4H4v16h5M10 12h11m-5-5 5 5-5 5"/>',
         menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
     };
