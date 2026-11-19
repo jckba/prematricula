@@ -1,0 +1,138 @@
+                                                   Table "prematricula.cronograma_prematricula"
+    Column     |            Type             | Collation | Nullable |                                   Default                                   
+---------------+-----------------------------+-----------+----------+-----------------------------------------------------------------------------
+ id_cronograma | bigint                      |           | not null | nextval('prematricula.cronograma_prematricula_id_cronograma_seq'::regclass)
+ id_periodo    | bigint                      |           | not null | 
+ fecha_inicio  | timestamp(0) with time zone |           | not null | 
+ fecha_fin     | timestamp(0) with time zone |           | not null | 
+ estado        | character varying(30)       |           | not null | 
+Indexes:
+    "cronograma_prematricula_pkey" PRIMARY KEY, btree (id_cronograma)
+    "pre_crono_periodo_uq" UNIQUE CONSTRAINT, btree (id_periodo)
+Check constraints:
+    "pre_crono_fechas_ck" CHECK (fecha_fin > fecha_inicio)
+Foreign-key constraints:
+    "pre_cr_per_fk" FOREIGN KEY (id_periodo) REFERENCES core.periodo_academico(id_periodo) ON DELETE RESTRICT
+
+      Sequence "prematricula.cronograma_prematricula_id_cronograma_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.cronograma_prematricula.id_cronograma
+
+Index "prematricula.cronograma_prematricula_pkey"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_cronograma | bigint | yes  | id_cronograma
+primary key, btree, for table "prematricula.cronograma_prematricula"
+
+                                                  Table "prematricula.detalle_solicitud"
+        Column        |         Type          | Collation | Nullable |                              Default                               
+----------------------+-----------------------+-----------+----------+--------------------------------------------------------------------
+ id_detalle           | bigint                |           | not null | nextval('prematricula.detalle_solicitud_id_detalle_seq'::regclass)
+ id_solicitud         | bigint                |           | not null | 
+ id_curso_plan        | bigint                |           | not null | 
+ id_seccion_preferida | bigint                |           |          | 
+ estado               | character varying(30) |           | not null | 
+ motivo_rechazo       | text                  |           |          | 
+Indexes:
+    "detalle_solicitud_pkey" PRIMARY KEY, btree (id_detalle)
+    "pre_det_curso_idx" btree (id_curso_plan)
+    "pre_det_sec_idx" btree (id_seccion_preferida)
+    "pre_det_sol_curso_uq" UNIQUE CONSTRAINT, btree (id_solicitud, id_curso_plan)
+Foreign-key constraints:
+    "pre_de_cur_fk" FOREIGN KEY (id_curso_plan) REFERENCES core.curso_plan(id_curso_plan) ON DELETE RESTRICT
+    "pre_de_sec_fk" FOREIGN KEY (id_seccion_preferida) REFERENCES core.seccion(id_seccion) ON DELETE RESTRICT
+    "pre_de_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE RESTRICT
+
+           Sequence "prematricula.detalle_solicitud_id_detalle_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.detalle_solicitud.id_detalle
+
+Index "prematricula.detalle_solicitud_pkey"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_detalle | bigint | yes  | id_detalle
+primary key, btree, for table "prematricula.detalle_solicitud"
+
+Index "prematricula.pre_crono_periodo_uq"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_periodo | bigint | yes  | id_periodo
+unique, btree, for table "prematricula.cronograma_prematricula"
+
+    Index "prematricula.pre_det_curso_idx"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_curso_plan | bigint | yes  | id_curso_plan
+btree, for table "prematricula.detalle_solicitud"
+
+            Index "prematricula.pre_det_sec_idx"
+        Column        |  Type  | Key? |      Definition      
+----------------------+--------+------+----------------------
+ id_seccion_preferida | bigint | yes  | id_seccion_preferida
+btree, for table "prematricula.detalle_solicitud"
+
+   Index "prematricula.pre_det_sol_curso_uq"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_solicitud  | bigint | yes  | id_solicitud
+ id_curso_plan | bigint | yes  | id_curso_plan
+unique, btree, for table "prematricula.detalle_solicitud"
+
+  Index "prematricula.pre_sol_est_periodo_uq"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_estudiante | bigint | yes  | id_estudiante
+ id_periodo    | bigint | yes  | id_periodo
+unique, btree, for table "prematricula.solicitud_prematricula"
+
+Index "prematricula.pre_sol_periodo_idx"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_periodo | bigint | yes  | id_periodo
+btree, for table "prematricula.solicitud_prematricula"
+
+  Index "prematricula.pre_sol_revisor_idx"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ revisado_por | bigint | yes  | revisado_por
+btree, for table "prematricula.solicitud_prematricula"
+
+                                                  Table "prematricula.solicitud_prematricula"
+    Column     |            Type             | Collation | Nullable |                                  Default                                  
+---------------+-----------------------------+-----------+----------+---------------------------------------------------------------------------
+ id_solicitud  | bigint                      |           | not null | nextval('prematricula.solicitud_prematricula_id_solicitud_seq'::regclass)
+ id_estudiante | bigint                      |           | not null | 
+ id_periodo    | bigint                      |           | not null | 
+ estado        | character varying(30)       |           | not null | 
+ observacion   | text                        |           |          | 
+ enviada_en    | timestamp(0) with time zone |           |          | 
+ revisado_por  | bigint                      |           |          | 
+ revisado_en   | timestamp(0) with time zone |           |          | 
+Indexes:
+    "solicitud_prematricula_pkey" PRIMARY KEY, btree (id_solicitud)
+    "pre_sol_est_periodo_uq" UNIQUE CONSTRAINT, btree (id_estudiante, id_periodo)
+    "pre_sol_periodo_idx" btree (id_periodo)
+    "pre_sol_revisor_idx" btree (revisado_por)
+Foreign-key constraints:
+    "pre_so_est_fk" FOREIGN KEY (id_estudiante) REFERENCES core.estudiante(id_estudiante) ON DELETE RESTRICT
+    "pre_so_per_fk" FOREIGN KEY (id_periodo) REFERENCES core.periodo_academico(id_periodo) ON DELETE RESTRICT
+    "pre_so_rev_fk" FOREIGN KEY (revisado_por) REFERENCES seguridad.usuario(id_usuario) ON DELETE RESTRICT
+Referenced by:
+    TABLE "prematricula.detalle_solicitud" CONSTRAINT "pre_de_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE RESTRICT
+
+       Sequence "prematricula.solicitud_prematricula_id_solicitud_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.solicitud_prematricula.id_solicitud
+
+Index "prematricula.solicitud_prematricula_pkey"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ id_solicitud | bigint | yes  | id_solicitud
+primary key, btree, for table "prematricula.solicitud_prematricula"
+

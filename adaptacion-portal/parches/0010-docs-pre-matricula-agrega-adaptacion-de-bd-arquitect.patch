@@ -1,0 +1,630 @@
+From 7ae57d3e3842f58ad8c9aff6dc74626caa348b49 Mon Sep 17 00:00:00 2001
+From: "Claude (borrador local)" <noreply@anthropic.com>
+Date: Tue, 17 Nov 2026 23:56:41 -0500
+Subject: [PATCH 10/10] docs(pre-matricula): agrega adaptacion de bd,
+ arquitectura, flujos y manual
+
+---
+ .../01-adaptacion-base-de-datos.md            | 164 ++++++++++++++++++
+ .../02-manual-de-arquitectura.md              | 145 ++++++++++++++++
+ .../pre-matricula/03-diagramas-de-flujo.md    |  96 ++++++++++
+ .../pre-matricula/04-manual-de-usuario.md     | 162 +++++++++++++++++
+ docs/modulos/pre-matricula/README.md          |  11 ++
+ 5 files changed, 578 insertions(+)
+ create mode 100644 docs/modulos/pre-matricula/01-adaptacion-base-de-datos.md
+ create mode 100644 docs/modulos/pre-matricula/02-manual-de-arquitectura.md
+ create mode 100644 docs/modulos/pre-matricula/03-diagramas-de-flujo.md
+ create mode 100644 docs/modulos/pre-matricula/04-manual-de-usuario.md
+ create mode 100644 docs/modulos/pre-matricula/README.md
+
+diff --git a/docs/modulos/pre-matricula/01-adaptacion-base-de-datos.md b/docs/modulos/pre-matricula/01-adaptacion-base-de-datos.md
+new file mode 100644
+index 0000000..6d902d1
+--- /dev/null
++++ b/docs/modulos/pre-matricula/01-adaptacion-base-de-datos.md
+@@ -0,0 +1,164 @@
++# Adaptación del modelo a la base de datos del portal
++
++## 1. Situación inicial
++
++El proyecto original (`jckba/prematricula`) tenía 17 tablas propias en el esquema `public` y en inglés. El portal ya tenía:
++
++- Datos institucionales compartidos en `core` y `seguridad` (estudiante, persona, curso, plan, período, docente, usuario).
++- Tres tablas en el esquema `prematricula`: `cronograma_prematricula`, `solicitud_prematricula` y `detalle_solicitud`.
++
++La indicación del equipo fue:
++
++1. **Caso 1:** si es posible, adaptarse a la base del repositorio.
++2. **Caso 2:** si no es posible, usar la base del repositorio y generar los cambios propuestos.
++
++El resultado es mixto: la identidad y el catálogo académico se adaptaron a `core`/`seguridad` (caso 1). Lo que el portal no tenía se agregó al esquema `prematricula` mediante migraciones nuevas (caso 2), sin tocar `core`, `seguridad`, `comun` ni otros módulos.
++
++## 2. Tabla de equivalencias
++
++| Tabla original | Destino en el portal | Caso | Decisión |
++| --- | --- | :---: | --- |
++| `users` (+ `cargo`) | `public.users` + roles Spatie (`alumno`, `director_escuela`, `secretaria`) | 1 | Se usan los roles ya configurados; el cargo DIRECTOR/SECRETARÍA es el propio rol |
++| `personal_access_tokens` | Sesión web de Laravel Breeze | 1 | El portal es web con sesión, no necesita tokens |
++| `students` | `core.estudiante` + `core.persona` | 1 | `codigo_universitario`, nombres y apellidos ya existen |
++| `students.creditos_maximos` | `prematricula.limite_creditos_estudiante` | 2 | `core.estudiante` no lo tiene y no se debe modificar `core` |
++| `courses` | `core.curso` (+ `core.curso_plan` para el ciclo) | 1 | Código, nombre, créditos y horas teoría/práctica/laboratorio ya existen |
++| `course_prerequisites` | `core.curso_prerequisito` | 1 | Relación entre `curso_plan` |
++| `academic_periods` | `core.periodo_academico` | 1 | Código, fechas y estado |
++| `pre_enrollment_windows` | `prematricula.cronograma_prematricula` | 1 + 2 | Se reutiliza la tabla y se le agrega `tipo`, `motivo`, `zona_horaria`, `creado_por`, `creado_en`; se cambia el único por período por "una ORDINARIA por período" |
++| `pre_enrollment_requests` | `prematricula.solicitud_prematricula` | 1 + 2 | Se agregan `id_revision_vigente`, `id_cronograma_correccion`, `creado_en`, `actualizado_en` |
++| `pre_enrollment_details` | `prematricula.detalle_solicitud` | 1 + 2 | Se agrega `preferencia_turno` |
++| `pre_enrollment_revisions` | `prematricula.revision_solicitud` | 2 | Tabla nueva con trigger de inmutabilidad |
++| `pre_enrollment_revision_courses` | `prematricula.revision_curso` | 2 | Tabla nueva; guarda también el turno para la demanda |
++| `pre_enrollment_validations` | `prematricula.validacion_solicitud` | 2 | Tabla nueva |
++| `academic_histories` | `prematricula.historial_academico` | 2 | Las notas definitivas son de `gestion_matriculas` (otro módulo) y no se permite FK entre módulos; se guarda una copia importada |
++| `academic_history_imports` | `prematricula.importacion_historial` | 2 | Tabla nueva |
++| `academic_history_changes` | `prematricula.cambio_historial` | 2 | Tabla nueva |
++| `teachers` | `core.docente` (+ `core.persona`) | 1 | `codigo_docente` y `horas_maximas` ya existen |
++| `teaching_assignments` | `prematricula.carga_docente` | 2 | Tabla nueva con baja lógica (`eliminado_en`) |
++| `teaching_assignment_changes` | `prematricula.cambio_carga_docente` | 2 | Tabla nueva |
++| `cache`, `jobs`, `sessions` | `public.*` del portal | 1 | Ya existen |
++
++### Equivalencias de columnas más importantes
++
++| Original | Portal |
++| --- | --- |
++| `student_id` | `id_estudiante` → `core.estudiante` |
++| `course_id` | `id_curso_plan` → `core.curso_plan` (el curso dentro del plan) |
++| `academic_period_id` | `id_periodo` → `core.periodo_academico` |
++| `teacher_id` | `id_docente` → `core.docente` |
++| `created_by`, `reviewed_by`, `actor_id` | `creado_por`, `revisado_por`, `id_actor` → `seguridad.usuario` |
++| `fecha_envio` | `enviada_en` |
++| `correction_window_id` | `id_cronograma_correccion` |
++| `current_revision_id` | `id_revision_vigente` |
++| `receipt_code` | `codigo_constancia` |
++| `submitted_at` | `enviada_en` |
++| `schema_version` | `version_esquema` |
++| `before` / `after` | `antes` / `despues` |
++| `deleted_at` | `eliminado_en` |
++| `created_at` / `updated_at` | `creado_en` / `actualizado_en` |
++
++### Usuario → estudiante
++
++En el proyecto original, `students.user_id` unía la cuenta con el estudiante. En el portal, la ruta es:
++
++```text
++public.users.email  ──(mismo correo)──►  seguridad.usuario.correo_institucional
++seguridad.usuario.id_persona  ──────────►  core.estudiante.id_persona
++```
++
++No se agregó columna para esto porque la identidad es de `core`/`seguridad`. Si el equipo decide unir `public.users` con `seguridad.usuario`, se hará en `app/Shared`.
++
++## 3. Migraciones creadas
++
++Todas en `app/Modules/PreMatricula/Database/Migrations/`, una por tabla, con `down()` simétrico:
++
++| Archivo | Tipo | Qué hace |
++| --- | --- | --- |
++| `2026_11_18_000001_add_tipo_ventana_to_cronogramas_prematricula_table` | alter | Tipo de ventana y autoría; una sola ORDINARIA por período |
++| `2026_11_18_000002_add_preferencia_turno_to_detalles_solicitud_table` | alter | Preferencia MANANA / TARDE / SIN_PREFERENCIA |
++| `2026_11_18_000003_create_revisiones_solicitud_table` | create | Revisión inmutable con constancia PDF |
++| `2026_11_18_000004_create_revisiones_cursos_table` | create | Cursos de cada revisión |
++| `2026_11_18_000005_create_validaciones_solicitud_table` | create | Validación académica vigente |
++| `2026_11_18_000006_add_revision_vigente_to_solicitudes_prematricula_table` | alter | Puntero a la revisión vigente y a la ventana de corrección |
++| `2026_11_18_000007_create_limites_creditos_estudiante_table` | create | Créditos máximos por estudiante |
++| `2026_11_18_000008_create_historiales_academicos_table` | create | Resultados oficiales importados |
++| `2026_11_18_000009_create_importaciones_historial_table` | create | Auditoría de importaciones |
++| `2026_11_18_000010_create_cambios_historial_table` | create | Antes/después por resultado |
++| `2026_11_18_000011_create_cargas_docentes_table` | create | Carga docente semanal |
++| `2026_11_18_000012_create_cambios_carga_docente_table` | create | Auditoría de la carga docente |
++
++Reglas cumplidas: nombres calificados `prematricula.tabla`; FK solo a `prematricula`, `core` y `seguridad`; ninguna FK a otro módulo; ninguna migración antigua editada; timestamps posteriores a las tablas referenciadas.
++
++## 4. MER del esquema `prematricula` (después)
++
++```mermaid
++erDiagram
++    CRONOGRAMA_PREMATRICULA ||--o{ REVISION_SOLICITUD : "ventana del envío"
++    CRONOGRAMA_PREMATRICULA ||--o{ SOLICITUD_PREMATRICULA : "ventana de corrección"
++    SOLICITUD_PREMATRICULA ||--o{ DETALLE_SOLICITUD : "borrador"
++    SOLICITUD_PREMATRICULA ||--o{ REVISION_SOLICITUD : "envíos"
++    SOLICITUD_PREMATRICULA |o--o| REVISION_SOLICITUD : "revisión vigente"
++    SOLICITUD_PREMATRICULA ||--o| VALIDACION_SOLICITUD : "validación"
++    REVISION_SOLICITUD ||--|{ REVISION_CURSO : "cursos"
++    IMPORTACION_HISTORIAL ||--o{ CAMBIO_HISTORIAL : "cambios"
++    HISTORIAL_ACADEMICO ||--o{ CAMBIO_HISTORIAL : "auditado en"
++    CARGA_DOCENTE ||--o{ CAMBIO_CARGA_DOCENTE : "auditoría"
++
++    CORE_ESTUDIANTE ||--o{ SOLICITUD_PREMATRICULA : ""
++    CORE_ESTUDIANTE ||--o| LIMITE_CREDITOS_ESTUDIANTE : ""
++    CORE_ESTUDIANTE ||--o{ HISTORIAL_ACADEMICO : ""
++    CORE_PERIODO_ACADEMICO ||--o{ CRONOGRAMA_PREMATRICULA : ""
++    CORE_PERIODO_ACADEMICO ||--o{ CARGA_DOCENTE : ""
++    CORE_CURSO_PLAN ||--o{ DETALLE_SOLICITUD : ""
++    CORE_CURSO_PLAN ||--o{ REVISION_CURSO : ""
++    CORE_CURSO_PLAN ||--o{ CARGA_DOCENTE : ""
++    CORE_DOCENTE ||--o{ CARGA_DOCENTE : ""
++    SEGURIDAD_USUARIO ||--o{ IMPORTACION_HISTORIAL : "creado_por"
++
++    SOLICITUD_PREMATRICULA {
++        bigint id_solicitud PK
++        bigint id_estudiante FK
++        bigint id_periodo FK
++        varchar estado
++        bigint id_revision_vigente FK
++        bigint id_cronograma_correccion FK
++    }
++    REVISION_SOLICITUD {
++        bigint id_revision PK
++        bigint id_solicitud FK
++        varchar motivo
++        int numero_revision
++        varchar codigo_constancia UK
++        jsonb snapshot
++        text pdf_base64
++    }
++    REVISION_CURSO {
++        bigint id_revision PK
++        bigint id_curso_plan PK
++        varchar preferencia_turno
++    }
++    CRONOGRAMA_PREMATRICULA {
++        bigint id_cronograma PK
++        bigint id_periodo FK
++        varchar tipo
++        timestamptz fecha_inicio
++        timestamptz fecha_fin
++    }
++    CARGA_DOCENTE {
++        bigint id_carga PK
++        bigint id_periodo FK
++        bigint id_curso_plan FK
++        bigint id_docente FK
++        numeric horas_teoria
++        numeric horas_practica
++        numeric horas_laboratorio
++        timestamptz eliminado_en
++    }
++```
++
++## 5. Pendientes que dependen del equipo
++
++- `App\Shared\Models\Core\Docente` no existe. `CargaDocente` guarda `id_docente` con FK a `core.docente`, pero la relación Eloquent se declarará cuando el equipo agregue ese modelo compartido.
++- Confirmar si las notas oficiales se seguirán importando a `prematricula.historial_academico` o si `gestion_matriculas` publicará un contrato de lectura.
++- Confirmar con Alex y Nick que el PDF se guarda en `revision_solicitud.pdf_base64` (o, si se prefiere archivo, usar `comun.archivo` en una migración posterior).
+diff --git a/docs/modulos/pre-matricula/02-manual-de-arquitectura.md b/docs/modulos/pre-matricula/02-manual-de-arquitectura.md
+new file mode 100644
+index 0000000..f9423d5
+--- /dev/null
++++ b/docs/modulos/pre-matricula/02-manual-de-arquitectura.md
+@@ -0,0 +1,145 @@
++# Manual de arquitectura — Módulo Pre Matrícula
++
++## 1. Lugar del módulo en el portal
++
++El portal es un **monolito modular** en Laravel 13 con PostgreSQL 17. Se despliega como una sola aplicación, pero cada módulo es dueño de su carpeta de código, sus vistas, sus rutas y su esquema de base de datos.
++
++```mermaid
++flowchart TB
++    subgraph Portal["Portal Gestión Dirección (Laravel 13)"]
++        direction TB
++        R["routes/web.php · routes/api.php"] --> M["app/Modules/PreMatricula"]
++        R --> O["Otros 10 módulos"]
++        M --> S["app/Shared (modelos core/seguridad, clases base)"]
++        O --> S
++    end
++    subgraph BD["PostgreSQL · portal_gestion_direccion"]
++        P[("prematricula")]
++        C[("core · seguridad · comun")]
++        X[("esquemas de otros módulos")]
++        PU[("public: users, roles, sesiones")]
++    end
++    M --> P
++    S --> C
++    S --> PU
++    O --> X
++    P -. "FK permitidas" .-> C
++    P -. "prohibido: FK o import" .-x X
++```
++
++| Dato | Valor |
++| --- | --- |
++| Módulo | Pre Matrícula |
++| Slug / URL | `pre-matricula` |
++| Esquema | `prematricula` |
++| Código | `app/Modules/PreMatricula/` |
++| Vistas | `resources/views/modules/pre-matricula/` |
++| Pruebas | `tests/Feature/PreMatricula/`, `tests/Unit/PreMatricula/` |
++| Permiso base | `pre-matricula.view` |
++
++## 2. Estructura de carpetas
++
++```text
++app/Modules/PreMatricula/
++├── Controllers/PreMatriculaController.php
++├── Database/Migrations/          # 3 originales + 12 de la adaptación
++├── Models/                       # 13 modelos (ver sección 4)
++├── Policies/RegistroPolicy.php
++├── Requests/PreMatriculaRequest.php
++├── Routes/{web,api}.php          # prefijo pre-matricula, nombres pre-matricula.*
++└── Services/PreMatriculaService.php
++```
++
++## 3. Flujo de una petición
++
++```mermaid
++sequenceDiagram
++    actor U as Usuario
++    participant RT as Route (pre-matricula.*)
++    participant RQ as FormRequest
++    participant CT as Controller
++    participant SV as Service
++    participant MD as Model (Eloquent)
++    participant DB as PostgreSQL
++    U->>RT: HTTP
++    RT->>RQ: middleware auth + permiso
++    RQ->>CT: datos validados y autorizados
++    CT->>SV: caso de uso
++    SV->>MD: DB::transaction(...)
++    MD->>DB: SQL sobre prematricula.* / core.*
++    DB-->>SV: filas o error de restricción
++    SV-->>CT: resultado
++    CT-->>U: vista Blade o JSON
++```
++
++- **Controller:** delgado; no contiene reglas de negocio.
++- **Request:** valida la entrada y autoriza (`authorize()`).
++- **Service:** casos de uso y transacciones. Ejemplos: `crearSolicitud()` y `demandaPorCurso()`.
++- **Model:** solo persistencia y relaciones.
++
++## 4. Modelos
++
++| Modelo | Tabla | Relaciones principales |
++| --- | --- | --- |
++| `CronogramaPrematricula` | `prematricula.cronograma_prematricula` | `periodo`, `autor`, `revisiones`; método `estaActiva()` |
++| `SolicitudPrematricula` | `prematricula.solicitud_prematricula` | `estudiante`, `periodo`, `detalles`, `revisiones`, `revisionVigente`, `validacion`, `cronogramaCorreccion` |
++| `DetalleSolicitud` | `prematricula.detalle_solicitud` | `solicitud`, `cursoPlan`, `seccionPreferida` |
++| `RevisionSolicitud` | `prematricula.revision_solicitud` | `solicitud`, `cronograma`, `cursos`, `cursosPlan`; oculta `pdf_base64` |
++| `RevisionCurso` | `prematricula.revision_curso` | `revision`, `cursoPlan` |
++| `ValidacionSolicitud` | `prematricula.validacion_solicitud` | `solicitud`, `revision` |
++| `LimiteCreditosEstudiante` | `prematricula.limite_creditos_estudiante` | `estudiante`; `creditosPara()` devuelve 22 por defecto |
++| `HistorialAcademico` | `prematricula.historial_academico` | `estudiante`, `cursoPlan`, `periodo`, `cambios` |
++| `ImportacionHistorial` | `prematricula.importacion_historial` | `autor`, `cambios` |
++| `CambioHistorial` | `prematricula.cambio_historial` | `importacion`, `historial` |
++| `CargaDocente` | `prematricula.carga_docente` | `periodo`, `cursoPlan`, `autor`, `editor`, `cambios`; baja lógica |
++| `CambioCargaDocente` | `prematricula.cambio_carga_docente` | `carga`, `actor` |
++| `Registro` | `prematricula.solicitud_prematricula` | Plantilla del portal; la usa `ModuleSchemaIsolationTest`, no se borra |
++
++Los datos institucionales se leen con los modelos compartidos `App\Shared\Models\Core\{Estudiante, Persona, Curso, CursoPlan, PeriodoAcademico, Seccion}` y `App\Shared\Models\Seguridad\Usuario`. El módulo no copia esos modelos ni importa clases de otros módulos.
++
++## 5. Reglas que garantiza la base de datos
++
++| Regla de negocio | Cómo se garantiza |
++| --- | --- |
++| Una solicitud por estudiante y período | `pre_sol_est_periodo_uq` |
++| Un curso no se repite en el borrador | `pre_det_sol_curso_uq` |
++| Una sola ventana ORDINARIA por período; varias EXTRAORDINARIA | índice único parcial `pre_crono_una_ordinaria_uq` + `pre_crono_tipo_ck` |
++| Ventana con fin posterior al inicio | `pre_crono_fechas_ck` |
++| Preferencia de turno válida | `pre_det_turno_ck`, `pre_rev_curso_turno_ck` |
++| Un envío siempre tiene número, constancia, fecha y PDF | `pre_rev_envio_completo_ck` |
++| Las revisiones enviadas no se modifican ni borran | trigger `pre_revision_inmutable` |
++| La revisión vigente pertenece a la misma solicitud | FK compuesta `pre_sol_rev_vigente_fk` |
++| Una validación por solicitud con estado válido | `pre_val_solicitud_uq`, `pre_val_estado_ck` |
++| Un resultado por estudiante/curso/período; nota de 0 a 20 | `pre_hist_est_curso_per_uq`, `pre_hist_nota_ck` |
++| Carga docente con horas no negativas y total positivo | `pre_carga_horas_ck` |
++| Una carga vigente por período/curso/docente; la baja la libera | índice único parcial `pre_carga_vigente_uq` |
++
++Las reglas que dependen de varias filas (créditos máximos, prerrequisitos, ventana activa, horas máximas del docente) van en los Services, dentro de transacciones.
++
++## 6. Demanda por curso (insumo del dashboard)
++
++`PreMatriculaService::demandaPorCurso($idPeriodo)` devuelve por curso: código, nombre, ciclo, estudiantes y conteo por turno. Solo cuenta la **revisión vigente** de cada solicitud con motivo `ENVIO`; los borradores, las capturas heredadas y las versiones reemplazadas no suman.
++
++## 7. Roles
++
++| Rol del proyecto original | Rol en el portal (Spatie) |
++| --- | --- |
++| `ESTUDIANTE` | `alumno` |
++| `COORDINADOR` / `DIRECTOR_ESCUELA` | `director_escuela` |
++| `COORDINADOR` / `SECRETARIA` | `secretaria` |
++
++Los docentes no tienen cuenta en este módulo (igual que en el proyecto original).
++
++## 8. Cómo probar
++
++```bash
++# Migrar solo el módulo (aplica antes lo compartido)
++docker compose exec app php artisan module:migrate pre-matricula
++docker compose exec app php artisan module:migrate:status pre-matricula
++
++# Pruebas (instalación local, contra una base de pruebas separada)
++vendor/bin/phpunit --filter=PreMatricula
++vendor/bin/phpunit tests/Unit/ModuleStructureTest.php
++```
++
++> Las pruebas que usan `RefreshDatabase` ejecutan `migrate:fresh`, que vacía `public.migrations`. Por eso hay que correrlas contra una base de pruebas, nunca contra la base de desarrollo.
+diff --git a/docs/modulos/pre-matricula/03-diagramas-de-flujo.md b/docs/modulos/pre-matricula/03-diagramas-de-flujo.md
+new file mode 100644
+index 0000000..72a337d
+--- /dev/null
++++ b/docs/modulos/pre-matricula/03-diagramas-de-flujo.md
+@@ -0,0 +1,96 @@
++# Diagramas de flujo — Módulo Pre Matrícula
++
++Los diagramas usan Mermaid: GitHub los dibuja automáticamente, y también se pueden pegar en [mermaid.live](https://mermaid.live) para exportarlos como imagen.
++
++## 1. Estudiante: registrar la prematrícula
++
++```mermaid
++flowchart TD
++    A([Inicio]) --> B[Iniciar sesión con rol alumno]
++    B --> C{¿Hay período en PREMATRICULA<br/>con una ventana activa?}
++    C -- No --> C1[Ver mensaje: prematrícula cerrada] --> Z([Fin])
++    C -- Sí --> D[Abrir o crear su solicitud del período<br/>estado BORRADOR]
++    D --> E[Ver cursos elegibles]
++    E --> F[Agregar curso y elegir turno<br/>MANANA / TARDE / SIN_PREFERENCIA]
++    F --> G{¿Curso válido?<br/>activo, no aprobado, no en curso,<br/>prerrequisitos y créditos}
++    G -- No --> G1[Mostrar motivo] --> E
++    G -- Sí --> H[Guardar en detalle_solicitud]
++    H --> I{¿Agregar otro curso?}
++    I -- Sí --> E
++    I -- No --> J[Enviar]
++    J --> K{¿Selección no vacía y<br/>ventana aún activa?}
++    K -- No --> K1[Mostrar error] --> E
++    K -- Sí --> L[Crear revision_solicitud ENVIO<br/>snapshot + número + constancia + PDF]
++    L --> M[Copiar cursos a revision_curso]
++    M --> N[Solicitud ENVIADA<br/>id_revision_vigente = nueva revisión]
++    N --> O[Descargar constancia PDF]
++    O --> Z
++```
++
++## 2. Estudiante: corregir en ventana extraordinaria
++
++```mermaid
++flowchart TD
++    A([Inicio]) --> B{¿Hay ventana EXTRAORDINARIA activa<br/>y la solicitud está ENVIADA?}
++    B -- No --> B1[No se puede corregir] --> Z([Fin])
++    B -- Sí --> C[Solicitud vuelve a BORRADOR<br/>id_cronograma_correccion = ventana]
++    C --> D[La revisión anterior se conserva<br/>y sigue contando en la demanda]
++    D --> E[Editar cursos y turnos]
++    E --> F[Reenviar]
++    F --> G[Nueva revision_solicitud<br/>numero_revision + 1 y nueva constancia]
++    G --> H[id_revision_vigente apunta a la nueva]
++    H --> Z
++```
++
++## 3. Coordinador: preparar el período
++
++```mermaid
++flowchart TD
++    A([Inicio]) --> B[Iniciar sesión<br/>director_escuela o secretaria]
++    B --> C[Verificar período en core.periodo_academico]
++    C --> D[Importar resultados oficiales XLSX]
++    D --> E{¿Archivo válido?}
++    E -- No --> E1[Ver errores por fila] --> D
++    E -- Sí --> F[Guardar historial_academico<br/>+ importacion_historial + cambio_historial]
++    F --> G[Revalidar solicitudes abiertas<br/>validacion_solicitud]
++    G --> H[Crear ventana ORDINARIA]
++    H --> I{¿Hace falta reabrir?}
++    I -- Sí --> J[Crear ventana EXTRAORDINARIA<br/>posterior y sin solaparse]
++    I -- No --> K[Consultar demanda por curso]
++    J --> K
++    K --> L[Exportar o ver dashboard]
++    L --> Z([Fin])
++```
++
++## 4. Coordinador: carga docente semanal
++
++```mermaid
++flowchart TD
++    A([Inicio]) --> B[Elegir período y curso]
++    B --> C[Elegir docente activo de core.docente]
++    C --> D[Ingresar horas de teoría, práctica y laboratorio]
++    D --> E{¿Horas ≥ 0 y total > 0?}
++    E -- No --> D
++    E -- Sí --> F{¿No supera las horas del curso<br/>ni el máximo del docente?}
++    F -- No --> F1[Mostrar exceso] --> D
++    F -- Sí --> G{¿Ya existe una carga vigente<br/>período + curso + docente?}
++    G -- Sí --> G1[Modificar horas<br/>acción CAMBIO]
++    G -- No --> G2[Crear carga_docente<br/>acción ALTA]
++    G1 --> H[Registrar cambio_carga_docente<br/>antes / después]
++    G2 --> H
++    H --> I{¿Dar de baja?}
++    I -- Sí --> J[eliminado_en = ahora<br/>acción BAJA; se conserva la fila]
++    I -- No --> Z([Fin])
++    J --> Z
++```
++
++## 5. Estados de la solicitud
++
++```mermaid
++stateDiagram-v2
++    [*] --> BORRADOR: crear en ventana ORDINARIA
++    BORRADOR --> ENVIADA: enviar (revisión n)
++    ENVIADA --> BORRADOR: corregir en ventana EXTRAORDINARIA
++    BORRADOR --> ENVIADA: reenviar (revisión n+1)
++    ENVIADA --> [*]: cierre del período
++```
+diff --git a/docs/modulos/pre-matricula/04-manual-de-usuario.md b/docs/modulos/pre-matricula/04-manual-de-usuario.md
+new file mode 100644
+index 0000000..35b624c
+--- /dev/null
++++ b/docs/modulos/pre-matricula/04-manual-de-usuario.md
+@@ -0,0 +1,162 @@
++# Manual de usuario — Módulo Pre Matrícula
++
++> **Estado:** este manual describe las funciones del módulo según el proyecto original y el modelo ya adaptado al portal. Donde dice **[Captura]** va una imagen de la pantalla real cuando la interfaz esté integrada.
++
++## 1. ¿Qué es la prematrícula?
++
++La prematrícula permite que cada estudiante **declare qué cursos piensa llevar** el próximo período y en qué turno los prefiere. Con esa información, la Dirección de Escuela calcula la **demanda por curso** y planifica la **carga docente**.
++
++Importante:
++
++- La prematrícula **no es la matrícula definitiva** y no se aprueba ni se rechaza: al enviarla queda **registrada**.
++- El turno es solo una **preferencia**; no asigna horario, sección ni aula.
++
++## 2. Acceso
++
++1. Entrar a la dirección del portal (en local: `http://localhost:8000`).
++2. Iniciar sesión con el correo y la contraseña entregados por el equipo.
++3. En el menú, abrir **Pre Matrícula**.
++
++| Rol en el portal | Quién es | Qué puede hacer |
++| --- | --- | --- |
++| `alumno` | Estudiante | Su propia solicitud, su constancia y su historial |
++| `director_escuela` | Director(a) de escuela | Todo lo del coordinador |
++| `secretaria` | Secretaría académica | Lo mismo que el director (mismos permisos) |
++
++[Captura: pantalla de inicio de sesión]
++
++---
++
++## 3. Estudiante (`alumno`)
++
++### 3.1 Ver si la prematrícula está abierta
++
++Al entrar al módulo verás el período y la ventana vigente:
++
++- **Ventana ordinaria:** el plazo normal para registrar la prematrícula.
++- **Ventana extraordinaria:** una reapertura, solo para corregir una prematrícula ya enviada.
++- Si no hay ventana activa, el sistema muestra que la prematrícula está cerrada. Igual puedes consultar tus envíos anteriores.
++
++Las ventanas empiezan a la hora indicada y terminan justo en la hora de cierre: a esa hora ya no se acepta el envío.
++
++[Captura: encabezado con período y ventana]
++
++### 3.2 Elegir cursos
++
++1. Abre **Cursos disponibles**. Solo aparecen los cursos que puedes llevar.
++2. Un curso **no** aparece o aparece bloqueado si:
++   - está inactivo;
++   - ya lo aprobaste;
++   - lo estás llevando en el período actual;
++   - te falta un prerrequisito aprobado (si el prerrequisito está *en curso*, se permite de forma provisional).
++3. Pulsa **Agregar** en cada curso.
++4. Elige el turno: **Mañana**, **Tarde** o **Sin preferencia**.
++5. Revisa el contador de créditos. No puedes superar tu **límite de créditos** (22 por defecto, o el que haya fijado la Dirección).
++
++Puedes quitar cursos o cambiar el turno mientras la ventana siga activa. Todo se guarda como **borrador**.
++
++[Captura: lista de cursos disponibles y borrador]
++
++### 3.3 Enviar
++
++1. Pulsa **Enviar prematrícula**.
++2. El sistema comprueba que tengas al menos un curso, que la ventana siga abierta y que tus cursos sigan siendo elegibles.
++3. Si todo está bien, la solicitud pasa a **ENVIADA** y se genera una **constancia PDF** con un código único.
++
++[Captura: confirmación de envío]
++
++### 3.4 Descargar la constancia
++
++En **Mis prematrículas** pulsa **Descargar constancia**. El PDF guarda exactamente lo que enviaste en ese momento, aunque después cambie el catálogo de cursos. También puedes descargar las constancias de envíos anteriores.
++
++[Captura: constancia PDF]
++
++### 3.5 Corregir un envío
++
++Solo es posible cuando la Dirección abre una **ventana extraordinaria**:
++
++1. Abre tu solicitud y pulsa **Corregir**.
++2. La solicitud vuelve a borrador. Tu envío anterior **sigue registrado** hasta que reenvíes.
++3. Haz los cambios y pulsa **Reenviar**. Se crea una nueva versión (revisión 2, 3, …) con una constancia nueva.
++
++Si la ventana extraordinaria se cierra antes de reenviar, queda vigente tu último envío.
++
++### 3.6 Ver mi historial académico
++
++En **Historial** ves tus resultados oficiales (aprobado, desaprobado, en curso o retirado). Es solo de lectura.
++
++### 3.7 Mensajes frecuentes
++
++| Mensaje | Qué significa | Qué hacer |
++| --- | --- | --- |
++| La prematrícula está cerrada | No hay ventana activa | Esperar la ventana o consultar a Secretaría |
++| Excede el límite de créditos | La suma supera tu máximo | Quitar un curso |
++| Falta prerrequisito | No tienes aprobado el curso requerido | Elegir otro curso o consultar a Dirección |
++| Curso ya agregado | El curso ya está en tu borrador | Ninguna acción |
++| Requiere ajuste | Un resultado nuevo cambió la elegibilidad de un curso enviado | Corregir en la próxima ventana extraordinaria |
++
++---
++
++## 4. Coordinador (`director_escuela` / `secretaria`)
++
++### 4.1 Importar resultados oficiales
++
++1. Abre **Historial académico → Importar**.
++2. Descarga la **plantilla XLSX** y complétala (código de estudiante, curso, período, nota y estado).
++3. Sube el archivo y pulsa **Validar**. Verás los errores por fila sin guardar nada.
++4. Escribe el **motivo** de la carga y pulsa **Confirmar**.
++5. En **Importaciones** puedes ver qué cambió en cada resultado (antes y después) y quién lo hizo.
++
++Al importar, el sistema vuelve a validar las solicitudes abiertas.
++
++[Captura: validación de importación]
++
++### 4.2 Abrir ventanas de prematrícula
++
++1. Abre **Períodos** y elige el período en estado PREMATRICULA.
++2. Pulsa **Nueva ventana**:
++   - **Ordinaria:** solo una por período.
++   - **Extraordinaria:** solo después de la ordinaria y sin solaparse con otras ventanas.
++3. Indica inicio, fin y motivo.
++
++Las ventanas no se editan ni se borran: quedan como historial.
++
++### 4.3 Límite de créditos
++
++En la ficha del estudiante puedes fijar su **límite de créditos**. Si no se fija, se usan 22.
++
++### 4.4 Consultar prematrículas
++
++En **Prematrículas** ves las solicitudes por período, sus envíos y sus constancias. Es una consulta: no existe aprobar ni rechazar.
++
++### 4.5 Demanda por curso
++
++En **Demanda** eliges el período y ves, por curso:
++
++- número de estudiantes que lo prematricularon;
++- cuántos prefieren mañana, tarde o no tienen preferencia.
++
++Solo cuenta el **último envío vigente** de cada estudiante; los borradores no cuentan. Estas cifras alimentan el **dashboard**.
++
++[Captura: dashboard de demanda]
++
++### 4.6 Carga docente
++
++1. Abre **Carga docente** y elige período y curso.
++2. Elige un docente activo e ingresa sus horas de teoría, práctica y laboratorio.
++3. El sistema no permite superar las horas del curso ni el máximo semanal del docente.
++4. Para quitar una asignación usa **Dar de baja**: se conserva en el historial y se liberan las horas.
++5. En **Historial** de cada asignación ves quién la creó, cambió o dio de baja.
++
++---
++
++## 5. Preguntas frecuentes
++
++**¿Mi prematrícula me asegura vacante?**
++No. Es una declaración de intención para planificar; la matrícula definitiva es otro proceso.
++
++**¿Puedo cambiar mi envío cuando quiera?**
++Solo durante una ventana extraordinaria.
++
++**¿Por qué mi constancia muestra un curso que ya no está en el catálogo?**
++La constancia es una foto del momento del envío y no se modifica.
+diff --git a/docs/modulos/pre-matricula/README.md b/docs/modulos/pre-matricula/README.md
+new file mode 100644
+index 0000000..a5868bd
+--- /dev/null
++++ b/docs/modulos/pre-matricula/README.md
+@@ -0,0 +1,11 @@
++# Módulo Pre Matrícula — documentación
++
++| Documento | Contenido |
++| --- | --- |
++| [01-adaptacion-base-de-datos.md](01-adaptacion-base-de-datos.md) | Cómo se adaptó el modelo del proyecto original al esquema `prematricula` del portal (casos 1 y 2), tabla de equivalencias y MER |
++| [02-manual-de-arquitectura.md](02-manual-de-arquitectura.md) | Capas, carpetas, dependencias, reglas de negocio que protege la base de datos y cómo probar |
++| [03-diagramas-de-flujo.md](03-diagramas-de-flujo.md) | Flujos del estudiante, de la corrección, del coordinador y de la carga docente |
++| [04-manual-de-usuario.md](04-manual-de-usuario.md) | Uso del módulo por rol: estudiante (`alumno`) y coordinador (`director_escuela`, `secretaria`) |
++
++Proyecto de origen: `jckba/prematricula` (API REST Laravel 13 + PostgreSQL).
++Destino: módulo `PreMatricula` del portal (`app/Modules/PreMatricula`, esquema `prematricula`).
+-- 
+2.43.0
+

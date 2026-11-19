@@ -1,0 +1,604 @@
+                                               Table "prematricula.cambio_carga_docente"
+  Column   |            Type             | Collation | Nullable |                               Default                                
+-----------+-----------------------------+-----------+----------+----------------------------------------------------------------------
+ id_cambio | bigint                      |           | not null | nextval('prematricula.cambio_carga_docente_id_cambio_seq'::regclass)
+ id_carga  | bigint                      |           | not null | 
+ id_actor  | bigint                      |           | not null | 
+ accion    | character varying(20)       |           | not null | 
+ antes     | jsonb                       |           |          | 
+ despues   | jsonb                       |           | not null | 
+ creado_en | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+Indexes:
+    "cambio_carga_docente_pkey" PRIMARY KEY, btree (id_cambio)
+    "pre_camb_carga_idx" btree (id_carga, id_cambio)
+Check constraints:
+    "pre_camb_carga_accion_ck" CHECK (accion::text = ANY (ARRAY['ALTA'::character varying, 'CAMBIO'::character varying, 'BAJA'::character varying]::text[]))
+Foreign-key constraints:
+    "pre_camb_carga_actor_fk" FOREIGN KEY (id_actor) REFERENCES seguridad.usuario(id_usuario) ON DELETE RESTRICT
+    "pre_camb_carga_fk" FOREIGN KEY (id_carga) REFERENCES prematricula.carga_docente(id_carga) ON DELETE RESTRICT
+
+          Sequence "prematricula.cambio_carga_docente_id_cambio_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.cambio_carga_docente.id_cambio
+
+Index "prematricula.cambio_carga_docente_pkey"
+  Column   |  Type  | Key? | Definition 
+-----------+--------+------+------------
+ id_cambio | bigint | yes  | id_cambio
+primary key, btree, for table "prematricula.cambio_carga_docente"
+
+                                                 Table "prematricula.cambio_historial"
+     Column     |            Type             | Collation | Nullable |                             Default                              
+----------------+-----------------------------+-----------+----------+------------------------------------------------------------------
+ id_cambio      | bigint                      |           | not null | nextval('prematricula.cambio_historial_id_cambio_seq'::regclass)
+ id_importacion | bigint                      |           | not null | 
+ id_historial   | bigint                      |           | not null | 
+ antes          | jsonb                       |           |          | 
+ despues        | jsonb                       |           | not null | 
+ creado_en      | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+Indexes:
+    "cambio_historial_pkey" PRIMARY KEY, btree (id_cambio)
+    "pre_camb_hist_hist_idx" btree (id_historial)
+    "pre_camb_hist_imp_idx" btree (id_importacion)
+Foreign-key constraints:
+    "pre_camb_hist_hist_fk" FOREIGN KEY (id_historial) REFERENCES prematricula.historial_academico(id_historial) ON DELETE RESTRICT
+    "pre_camb_hist_imp_fk" FOREIGN KEY (id_importacion) REFERENCES prematricula.importacion_historial(id_importacion) ON DELETE RESTRICT
+
+            Sequence "prematricula.cambio_historial_id_cambio_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.cambio_historial.id_cambio
+
+Index "prematricula.cambio_historial_pkey"
+  Column   |  Type  | Key? | Definition 
+-----------+--------+------+------------
+ id_cambio | bigint | yes  | id_cambio
+primary key, btree, for table "prematricula.cambio_historial"
+
+                                                  Table "prematricula.carga_docente"
+      Column       |            Type             | Collation | Nullable |                           Default                            
+-------------------+-----------------------------+-----------+----------+--------------------------------------------------------------
+ id_carga          | bigint                      |           | not null | nextval('prematricula.carga_docente_id_carga_seq'::regclass)
+ id_periodo        | bigint                      |           | not null | 
+ id_curso_plan     | bigint                      |           | not null | 
+ id_docente        | bigint                      |           | not null | 
+ horas_teoria      | numeric(5,2)                |           | not null | '0'::numeric
+ horas_practica    | numeric(5,2)                |           | not null | '0'::numeric
+ horas_laboratorio | numeric(5,2)                |           | not null | '0'::numeric
+ creado_por        | bigint                      |           | not null | 
+ actualizado_por   | bigint                      |           | not null | 
+ creado_en         | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+ actualizado_en    | timestamp(0) with time zone |           |          | 
+ eliminado_en      | timestamp(0) with time zone |           |          | 
+Indexes:
+    "carga_docente_pkey" PRIMARY KEY, btree (id_carga)
+    "pre_carga_curso_per_idx" btree (id_curso_plan, id_periodo)
+    "pre_carga_doc_idx" btree (id_docente)
+    "pre_carga_per_doc_idx" btree (id_periodo, id_docente)
+    "pre_carga_vigente_uq" UNIQUE, btree (id_periodo, id_curso_plan, id_docente) WHERE eliminado_en IS NULL
+Check constraints:
+    "pre_carga_horas_ck" CHECK (horas_teoria >= 0::numeric AND horas_practica >= 0::numeric AND horas_laboratorio >= 0::numeric AND (horas_teoria + horas_practica + horas_laboratorio) > 0::numeric)
+Foreign-key constraints:
+    "pre_carga_autor_fk" FOREIGN KEY (creado_por) REFERENCES seguridad.usuario(id_usuario) ON DELETE RESTRICT
+    "pre_carga_cp_fk" FOREIGN KEY (id_curso_plan) REFERENCES core.curso_plan(id_curso_plan) ON DELETE RESTRICT
+    "pre_carga_doc_fk" FOREIGN KEY (id_docente) REFERENCES core.docente(id_docente) ON DELETE RESTRICT
+    "pre_carga_editor_fk" FOREIGN KEY (actualizado_por) REFERENCES seguridad.usuario(id_usuario) ON DELETE RESTRICT
+    "pre_carga_per_fk" FOREIGN KEY (id_periodo) REFERENCES core.periodo_academico(id_periodo) ON DELETE RESTRICT
+Referenced by:
+    TABLE "prematricula.cambio_carga_docente" CONSTRAINT "pre_camb_carga_fk" FOREIGN KEY (id_carga) REFERENCES prematricula.carga_docente(id_carga) ON DELETE RESTRICT
+
+              Sequence "prematricula.carga_docente_id_carga_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.carga_docente.id_carga
+
+Index "prematricula.carga_docente_pkey"
+  Column  |  Type  | Key? | Definition 
+----------+--------+------+------------
+ id_carga | bigint | yes  | id_carga
+primary key, btree, for table "prematricula.carga_docente"
+
+                                                   Table "prematricula.cronograma_prematricula"
+    Column     |            Type             | Collation | Nullable |                                   Default                                   
+---------------+-----------------------------+-----------+----------+-----------------------------------------------------------------------------
+ id_cronograma | bigint                      |           | not null | nextval('prematricula.cronograma_prematricula_id_cronograma_seq'::regclass)
+ id_periodo    | bigint                      |           | not null | 
+ fecha_inicio  | timestamp(0) with time zone |           | not null | 
+ fecha_fin     | timestamp(0) with time zone |           | not null | 
+ estado        | character varying(30)       |           | not null | 
+ tipo          | character varying(20)       |           | not null | 'ORDINARIA'::character varying
+ motivo        | text                        |           |          | 
+ zona_horaria  | character varying(64)       |           | not null | 'America/Lima'::character varying
+ creado_por    | bigint                      |           |          | 
+ creado_en     | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+Indexes:
+    "cronograma_prematricula_pkey" PRIMARY KEY, btree (id_cronograma)
+    "pre_crono_periodo_rango_idx" btree (id_periodo, fecha_inicio, fecha_fin)
+    "pre_crono_una_ordinaria_uq" UNIQUE, btree (id_periodo) WHERE tipo::text = 'ORDINARIA'::text
+Check constraints:
+    "pre_crono_fechas_ck" CHECK (fecha_fin > fecha_inicio)
+    "pre_crono_tipo_ck" CHECK (tipo::text = ANY (ARRAY['ORDINARIA'::character varying, 'EXTRAORDINARIA'::character varying]::text[]))
+Foreign-key constraints:
+    "pre_cr_per_fk" FOREIGN KEY (id_periodo) REFERENCES core.periodo_academico(id_periodo) ON DELETE RESTRICT
+    "pre_crono_autor_fk" FOREIGN KEY (creado_por) REFERENCES seguridad.usuario(id_usuario) ON DELETE RESTRICT
+Referenced by:
+    TABLE "prematricula.revision_solicitud" CONSTRAINT "pre_rev_crono_fk" FOREIGN KEY (id_cronograma) REFERENCES prematricula.cronograma_prematricula(id_cronograma) ON DELETE RESTRICT
+    TABLE "prematricula.solicitud_prematricula" CONSTRAINT "pre_sol_crono_corr_fk" FOREIGN KEY (id_cronograma_correccion) REFERENCES prematricula.cronograma_prematricula(id_cronograma) ON DELETE RESTRICT
+
+      Sequence "prematricula.cronograma_prematricula_id_cronograma_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.cronograma_prematricula.id_cronograma
+
+Index "prematricula.cronograma_prematricula_pkey"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_cronograma | bigint | yes  | id_cronograma
+primary key, btree, for table "prematricula.cronograma_prematricula"
+
+                                                  Table "prematricula.detalle_solicitud"
+        Column        |         Type          | Collation | Nullable |                              Default                               
+----------------------+-----------------------+-----------+----------+--------------------------------------------------------------------
+ id_detalle           | bigint                |           | not null | nextval('prematricula.detalle_solicitud_id_detalle_seq'::regclass)
+ id_solicitud         | bigint                |           | not null | 
+ id_curso_plan        | bigint                |           | not null | 
+ id_seccion_preferida | bigint                |           |          | 
+ estado               | character varying(30) |           | not null | 
+ motivo_rechazo       | text                  |           |          | 
+ preferencia_turno    | character varying(30) |           | not null | 'SIN_PREFERENCIA'::character varying
+Indexes:
+    "detalle_solicitud_pkey" PRIMARY KEY, btree (id_detalle)
+    "pre_det_curso_idx" btree (id_curso_plan)
+    "pre_det_sec_idx" btree (id_seccion_preferida)
+    "pre_det_sol_curso_uq" UNIQUE CONSTRAINT, btree (id_solicitud, id_curso_plan)
+Check constraints:
+    "pre_det_turno_ck" CHECK (preferencia_turno::text = ANY (ARRAY['MANANA'::character varying, 'TARDE'::character varying, 'SIN_PREFERENCIA'::character varying]::text[]))
+Foreign-key constraints:
+    "pre_de_cur_fk" FOREIGN KEY (id_curso_plan) REFERENCES core.curso_plan(id_curso_plan) ON DELETE RESTRICT
+    "pre_de_sec_fk" FOREIGN KEY (id_seccion_preferida) REFERENCES core.seccion(id_seccion) ON DELETE RESTRICT
+    "pre_de_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE RESTRICT
+
+           Sequence "prematricula.detalle_solicitud_id_detalle_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.detalle_solicitud.id_detalle
+
+Index "prematricula.detalle_solicitud_pkey"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_detalle | bigint | yes  | id_detalle
+primary key, btree, for table "prematricula.detalle_solicitud"
+
+                                                   Table "prematricula.historial_academico"
+     Column     |            Type             | Collation | Nullable |                                Default                                 
+----------------+-----------------------------+-----------+----------+------------------------------------------------------------------------
+ id_historial   | bigint                      |           | not null | nextval('prematricula.historial_academico_id_historial_seq'::regclass)
+ id_estudiante  | bigint                      |           | not null | 
+ id_curso_plan  | bigint                      |           | not null | 
+ id_periodo     | bigint                      |           | not null | 
+ nota_final     | numeric(5,2)                |           |          | 
+ estado         | character varying(20)       |           | not null | 
+ creado_en      | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+ actualizado_en | timestamp(0) with time zone |           |          | 
+Indexes:
+    "historial_academico_pkey" PRIMARY KEY, btree (id_historial)
+    "pre_hist_curso_idx" btree (id_curso_plan)
+    "pre_hist_est_curso_per_uq" UNIQUE CONSTRAINT, btree (id_estudiante, id_curso_plan, id_periodo)
+    "pre_hist_periodo_idx" btree (id_periodo)
+Check constraints:
+    "pre_hist_estado_ck" CHECK (estado::text = ANY (ARRAY['EN_CURSO'::character varying, 'APROBADO'::character varying, 'DESAPROBADO'::character varying, 'RETIRADO'::character varying]::text[]))
+    "pre_hist_nota_ck" CHECK (nota_final IS NULL OR nota_final >= 0::numeric AND nota_final <= 20::numeric)
+Foreign-key constraints:
+    "pre_hist_cp_fk" FOREIGN KEY (id_curso_plan) REFERENCES core.curso_plan(id_curso_plan) ON DELETE RESTRICT
+    "pre_hist_est_fk" FOREIGN KEY (id_estudiante) REFERENCES core.estudiante(id_estudiante) ON DELETE RESTRICT
+    "pre_hist_per_fk" FOREIGN KEY (id_periodo) REFERENCES core.periodo_academico(id_periodo) ON DELETE RESTRICT
+Referenced by:
+    TABLE "prematricula.cambio_historial" CONSTRAINT "pre_camb_hist_hist_fk" FOREIGN KEY (id_historial) REFERENCES prematricula.historial_academico(id_historial) ON DELETE RESTRICT
+
+         Sequence "prematricula.historial_academico_id_historial_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.historial_academico.id_historial
+
+Index "prematricula.historial_academico_pkey"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ id_historial | bigint | yes  | id_historial
+primary key, btree, for table "prematricula.historial_academico"
+
+                                                    Table "prematricula.importacion_historial"
+     Column     |            Type             | Collation | Nullable |                                  Default                                   
+----------------+-----------------------------+-----------+----------+----------------------------------------------------------------------------
+ id_importacion | bigint                      |           | not null | nextval('prematricula.importacion_historial_id_importacion_seq'::regclass)
+ creado_por     | bigint                      |           | not null | 
+ sha256         | character varying(64)       |           | not null | 
+ motivo         | text                        |           | not null | 
+ resumen        | jsonb                       |           | not null | 
+ creado_en      | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+Indexes:
+    "importacion_historial_pkey" PRIMARY KEY, btree (id_importacion)
+    "pre_imp_autor_idx" btree (creado_por)
+Foreign-key constraints:
+    "pre_imp_autor_fk" FOREIGN KEY (creado_por) REFERENCES seguridad.usuario(id_usuario) ON DELETE RESTRICT
+Referenced by:
+    TABLE "prematricula.cambio_historial" CONSTRAINT "pre_camb_hist_imp_fk" FOREIGN KEY (id_importacion) REFERENCES prematricula.importacion_historial(id_importacion) ON DELETE RESTRICT
+
+       Sequence "prematricula.importacion_historial_id_importacion_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.importacion_historial.id_importacion
+
+ Index "prematricula.importacion_historial_pkey"
+     Column     |  Type  | Key? |   Definition   
+----------------+--------+------+----------------
+ id_importacion | bigint | yes  | id_importacion
+primary key, btree, for table "prematricula.importacion_historial"
+
+                                                  Table "prematricula.limite_creditos_estudiante"
+      Column      |            Type             | Collation | Nullable |                                  Default                                   
+------------------+-----------------------------+-----------+----------+----------------------------------------------------------------------------
+ id_limite        | bigint                      |           | not null | nextval('prematricula.limite_creditos_estudiante_id_limite_seq'::regclass)
+ id_estudiante    | bigint                      |           | not null | 
+ creditos_maximos | smallint                    |           | not null | '22'::smallint
+ actualizado_en   | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+Indexes:
+    "limite_creditos_estudiante_pkey" PRIMARY KEY, btree (id_limite)
+    "pre_lim_estudiante_uq" UNIQUE CONSTRAINT, btree (id_estudiante)
+Check constraints:
+    "pre_lim_creditos_ck" CHECK (creditos_maximos > 0)
+Foreign-key constraints:
+    "pre_lim_est_fk" FOREIGN KEY (id_estudiante) REFERENCES core.estudiante(id_estudiante) ON DELETE RESTRICT
+
+       Sequence "prematricula.limite_creditos_estudiante_id_limite_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.limite_creditos_estudiante.id_limite
+
+Index "prematricula.limite_creditos_estudiante_pkey"
+  Column   |  Type  | Key? | Definition 
+-----------+--------+------+------------
+ id_limite | bigint | yes  | id_limite
+primary key, btree, for table "prematricula.limite_creditos_estudiante"
+
+Index "prematricula.pre_camb_carga_idx"
+  Column   |  Type  | Key? | Definition 
+-----------+--------+------+------------
+ id_carga  | bigint | yes  | id_carga
+ id_cambio | bigint | yes  | id_cambio
+btree, for table "prematricula.cambio_carga_docente"
+
+ Index "prematricula.pre_camb_hist_hist_idx"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ id_historial | bigint | yes  | id_historial
+btree, for table "prematricula.cambio_historial"
+
+   Index "prematricula.pre_camb_hist_imp_idx"
+     Column     |  Type  | Key? |   Definition   
+----------------+--------+------+----------------
+ id_importacion | bigint | yes  | id_importacion
+btree, for table "prematricula.cambio_historial"
+
+ Index "prematricula.pre_carga_curso_per_idx"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_curso_plan | bigint | yes  | id_curso_plan
+ id_periodo    | bigint | yes  | id_periodo
+btree, for table "prematricula.carga_docente"
+
+ Index "prematricula.pre_carga_doc_idx"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_docente | bigint | yes  | id_docente
+btree, for table "prematricula.carga_docente"
+
+Index "prematricula.pre_carga_per_doc_idx"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_periodo | bigint | yes  | id_periodo
+ id_docente | bigint | yes  | id_docente
+btree, for table "prematricula.carga_docente"
+
+   Index "prematricula.pre_carga_vigente_uq"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_periodo    | bigint | yes  | id_periodo
+ id_curso_plan | bigint | yes  | id_curso_plan
+ id_docente    | bigint | yes  | id_docente
+unique, btree, for table "prematricula.carga_docente", predicate (eliminado_en IS NULL)
+
+         Index "prematricula.pre_crono_periodo_rango_idx"
+    Column    |            Type             | Key? |  Definition  
+--------------+-----------------------------+------+--------------
+ id_periodo   | bigint                      | yes  | id_periodo
+ fecha_inicio | timestamp(0) with time zone | yes  | fecha_inicio
+ fecha_fin    | timestamp(0) with time zone | yes  | fecha_fin
+btree, for table "prematricula.cronograma_prematricula"
+
+Index "prematricula.pre_crono_una_ordinaria_uq"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_periodo | bigint | yes  | id_periodo
+unique, btree, for table "prematricula.cronograma_prematricula", predicate (tipo::text = 'ORDINARIA'::text)
+
+    Index "prematricula.pre_det_curso_idx"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_curso_plan | bigint | yes  | id_curso_plan
+btree, for table "prematricula.detalle_solicitud"
+
+            Index "prematricula.pre_det_sec_idx"
+        Column        |  Type  | Key? |      Definition      
+----------------------+--------+------+----------------------
+ id_seccion_preferida | bigint | yes  | id_seccion_preferida
+btree, for table "prematricula.detalle_solicitud"
+
+   Index "prematricula.pre_det_sol_curso_uq"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_solicitud  | bigint | yes  | id_solicitud
+ id_curso_plan | bigint | yes  | id_curso_plan
+unique, btree, for table "prematricula.detalle_solicitud"
+
+    Index "prematricula.pre_hist_curso_idx"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_curso_plan | bigint | yes  | id_curso_plan
+btree, for table "prematricula.historial_academico"
+
+Index "prematricula.pre_hist_est_curso_per_uq"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_estudiante | bigint | yes  | id_estudiante
+ id_curso_plan | bigint | yes  | id_curso_plan
+ id_periodo    | bigint | yes  | id_periodo
+unique, btree, for table "prematricula.historial_academico"
+
+Index "prematricula.pre_hist_periodo_idx"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_periodo | bigint | yes  | id_periodo
+btree, for table "prematricula.historial_academico"
+
+ Index "prematricula.pre_imp_autor_idx"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ creado_por | bigint | yes  | creado_por
+btree, for table "prematricula.importacion_historial"
+
+  Index "prematricula.pre_lim_estudiante_uq"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_estudiante | bigint | yes  | id_estudiante
+unique, btree, for table "prematricula.limite_creditos_estudiante"
+
+              Index "prematricula.pre_rev_constancia_uq"
+      Column       |         Type          | Key? |    Definition     
+-------------------+-----------------------+------+-------------------
+ codigo_constancia | character varying(50) | yes  | codigo_constancia
+unique, btree, for table "prematricula.revision_solicitud"
+
+    Index "prematricula.pre_rev_crono_idx"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_cronograma | bigint | yes  | id_cronograma
+btree, for table "prematricula.revision_solicitud"
+
+ Index "prematricula.pre_rev_curso_curso_idx"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_curso_plan | bigint | yes  | id_curso_plan
+btree, for table "prematricula.revision_curso"
+
+       Index "prematricula.pre_rev_numero_uq"
+     Column      |  Type   | Key? |   Definition    
+-----------------+---------+------+-----------------
+ id_solicitud    | bigint  | yes  | id_solicitud
+ numero_revision | integer | yes  | numero_revision
+unique, btree, for table "prematricula.revision_solicitud"
+
+Index "prematricula.pre_rev_solicitud_identidad_uq"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ id_solicitud | bigint | yes  | id_solicitud
+ id_revision  | bigint | yes  | id_revision
+unique, btree, for table "prematricula.revision_solicitud"
+
+             Index "prematricula.pre_sol_crono_corr_idx"
+          Column          |  Type  | Key? |        Definition        
+--------------------------+--------+------+--------------------------
+ id_cronograma_correccion | bigint | yes  | id_cronograma_correccion
+btree, for table "prematricula.solicitud_prematricula"
+
+  Index "prematricula.pre_sol_est_periodo_uq"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_estudiante | bigint | yes  | id_estudiante
+ id_periodo    | bigint | yes  | id_periodo
+unique, btree, for table "prematricula.solicitud_prematricula"
+
+Index "prematricula.pre_sol_periodo_idx"
+   Column   |  Type  | Key? | Definition 
+------------+--------+------+------------
+ id_periodo | bigint | yes  | id_periodo
+btree, for table "prematricula.solicitud_prematricula"
+
+       Index "prematricula.pre_sol_periodo_rev_idx"
+       Column        |  Type  | Key? |     Definition      
+---------------------+--------+------+---------------------
+ id_periodo          | bigint | yes  | id_periodo
+ id_revision_vigente | bigint | yes  | id_revision_vigente
+btree, for table "prematricula.solicitud_prematricula"
+
+  Index "prematricula.pre_sol_revisor_idx"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ revisado_por | bigint | yes  | revisado_por
+btree, for table "prematricula.solicitud_prematricula"
+
+   Index "prematricula.pre_val_rev_idx"
+   Column    |  Type  | Key? | Definition  
+-------------+--------+------+-------------
+ id_revision | bigint | yes  | id_revision
+btree, for table "prematricula.validacion_solicitud"
+
+  Index "prematricula.pre_val_solicitud_uq"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ id_solicitud | bigint | yes  | id_solicitud
+unique, btree, for table "prematricula.validacion_solicitud"
+
+                                   Table "prematricula.revision_curso"
+      Column       |         Type          | Collation | Nullable |               Default                
+-------------------+-----------------------+-----------+----------+--------------------------------------
+ id_revision       | bigint                |           | not null | 
+ id_curso_plan     | bigint                |           | not null | 
+ preferencia_turno | character varying(30) |           | not null | 'SIN_PREFERENCIA'::character varying
+Indexes:
+    "revision_curso_pkey" PRIMARY KEY, btree (id_revision, id_curso_plan)
+    "pre_rev_curso_curso_idx" btree (id_curso_plan)
+Check constraints:
+    "pre_rev_curso_turno_ck" CHECK (preferencia_turno::text = ANY (ARRAY['MANANA'::character varying, 'TARDE'::character varying, 'SIN_PREFERENCIA'::character varying]::text[]))
+Foreign-key constraints:
+    "pre_rev_curso_cp_fk" FOREIGN KEY (id_curso_plan) REFERENCES core.curso_plan(id_curso_plan) ON DELETE RESTRICT
+    "pre_rev_curso_rev_fk" FOREIGN KEY (id_revision) REFERENCES prematricula.revision_solicitud(id_revision) ON DELETE RESTRICT
+
+   Index "prematricula.revision_curso_pkey"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_revision   | bigint | yes  | id_revision
+ id_curso_plan | bigint | yes  | id_curso_plan
+primary key, btree, for table "prematricula.revision_curso"
+
+                                                    Table "prematricula.revision_solicitud"
+      Column       |            Type             | Collation | Nullable |                               Default                                
+-------------------+-----------------------------+-----------+----------+----------------------------------------------------------------------
+ id_revision       | bigint                      |           | not null | nextval('prematricula.revision_solicitud_id_revision_seq'::regclass)
+ id_solicitud      | bigint                      |           | not null | 
+ id_cronograma     | bigint                      |           |          | 
+ motivo            | character varying(50)       |           | not null | 
+ numero_revision   | integer                     |           |          | 
+ codigo_constancia | character varying(50)       |           |          | 
+ snapshot          | jsonb                       |           | not null | 
+ version_esquema   | smallint                    |           | not null | '2'::smallint
+ pdf_base64        | text                        |           |          | 
+ pdf_sha256        | character varying(64)       |           |          | 
+ enviada_en        | timestamp(0) with time zone |           |          | 
+ creado_en         | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+Indexes:
+    "revision_solicitud_pkey" PRIMARY KEY, btree (id_revision)
+    "pre_rev_constancia_uq" UNIQUE CONSTRAINT, btree (codigo_constancia)
+    "pre_rev_crono_idx" btree (id_cronograma)
+    "pre_rev_numero_uq" UNIQUE CONSTRAINT, btree (id_solicitud, numero_revision)
+    "pre_rev_solicitud_identidad_uq" UNIQUE CONSTRAINT, btree (id_solicitud, id_revision)
+Check constraints:
+    "pre_rev_envio_completo_ck" CHECK (motivo::text <> 'ENVIO'::text OR numero_revision IS NOT NULL AND codigo_constancia IS NOT NULL AND enviada_en IS NOT NULL AND pdf_base64 IS NOT NULL AND octet_length(pdf_base64) > 0 AND pdf_sha256 IS NOT NULL AND length(pdf_sha256::text) = 64)
+    "pre_rev_motivo_ck" CHECK (motivo::text = ANY (ARRAY['ENVIO'::character varying, 'LEGACY_CAPTURE'::character varying]::text[]))
+    "pre_rev_numero_ck" CHECK (numero_revision IS NULL OR numero_revision > 0)
+Foreign-key constraints:
+    "pre_rev_crono_fk" FOREIGN KEY (id_cronograma) REFERENCES prematricula.cronograma_prematricula(id_cronograma) ON DELETE RESTRICT
+    "pre_rev_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE RESTRICT
+Referenced by:
+    TABLE "prematricula.revision_curso" CONSTRAINT "pre_rev_curso_rev_fk" FOREIGN KEY (id_revision) REFERENCES prematricula.revision_solicitud(id_revision) ON DELETE RESTRICT
+    TABLE "prematricula.solicitud_prematricula" CONSTRAINT "pre_sol_rev_vigente_fk" FOREIGN KEY (id_solicitud, id_revision_vigente) REFERENCES prematricula.revision_solicitud(id_solicitud, id_revision) ON DELETE RESTRICT
+    TABLE "prematricula.validacion_solicitud" CONSTRAINT "pre_val_rev_fk" FOREIGN KEY (id_revision) REFERENCES prematricula.revision_solicitud(id_revision) ON DELETE RESTRICT
+Triggers:
+    pre_revision_inmutable BEFORE DELETE OR UPDATE ON prematricula.revision_solicitud FOR EACH ROW EXECUTE FUNCTION prematricula.proteger_revision_solicitud()
+
+          Sequence "prematricula.revision_solicitud_id_revision_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.revision_solicitud.id_revision
+
+Index "prematricula.revision_solicitud_pkey"
+   Column    |  Type  | Key? | Definition  
+-------------+--------+------+-------------
+ id_revision | bigint | yes  | id_revision
+primary key, btree, for table "prematricula.revision_solicitud"
+
+                                                        Table "prematricula.solicitud_prematricula"
+          Column          |            Type             | Collation | Nullable |                                  Default                                  
+--------------------------+-----------------------------+-----------+----------+---------------------------------------------------------------------------
+ id_solicitud             | bigint                      |           | not null | nextval('prematricula.solicitud_prematricula_id_solicitud_seq'::regclass)
+ id_estudiante            | bigint                      |           | not null | 
+ id_periodo               | bigint                      |           | not null | 
+ estado                   | character varying(30)       |           | not null | 
+ observacion              | text                        |           |          | 
+ enviada_en               | timestamp(0) with time zone |           |          | 
+ revisado_por             | bigint                      |           |          | 
+ revisado_en              | timestamp(0) with time zone |           |          | 
+ id_revision_vigente      | bigint                      |           |          | 
+ id_cronograma_correccion | bigint                      |           |          | 
+ creado_en                | timestamp(0) with time zone |           | not null | CURRENT_TIMESTAMP
+ actualizado_en           | timestamp(0) with time zone |           |          | 
+Indexes:
+    "solicitud_prematricula_pkey" PRIMARY KEY, btree (id_solicitud)
+    "pre_sol_crono_corr_idx" btree (id_cronograma_correccion)
+    "pre_sol_est_periodo_uq" UNIQUE CONSTRAINT, btree (id_estudiante, id_periodo)
+    "pre_sol_periodo_idx" btree (id_periodo)
+    "pre_sol_periodo_rev_idx" btree (id_periodo, id_revision_vigente)
+    "pre_sol_revisor_idx" btree (revisado_por)
+Foreign-key constraints:
+    "pre_so_est_fk" FOREIGN KEY (id_estudiante) REFERENCES core.estudiante(id_estudiante) ON DELETE RESTRICT
+    "pre_so_per_fk" FOREIGN KEY (id_periodo) REFERENCES core.periodo_academico(id_periodo) ON DELETE RESTRICT
+    "pre_so_rev_fk" FOREIGN KEY (revisado_por) REFERENCES seguridad.usuario(id_usuario) ON DELETE RESTRICT
+    "pre_sol_crono_corr_fk" FOREIGN KEY (id_cronograma_correccion) REFERENCES prematricula.cronograma_prematricula(id_cronograma) ON DELETE RESTRICT
+    "pre_sol_rev_vigente_fk" FOREIGN KEY (id_solicitud, id_revision_vigente) REFERENCES prematricula.revision_solicitud(id_solicitud, id_revision) ON DELETE RESTRICT
+Referenced by:
+    TABLE "prematricula.detalle_solicitud" CONSTRAINT "pre_de_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE RESTRICT
+    TABLE "prematricula.revision_solicitud" CONSTRAINT "pre_rev_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE RESTRICT
+    TABLE "prematricula.validacion_solicitud" CONSTRAINT "pre_val_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE CASCADE
+
+       Sequence "prematricula.solicitud_prematricula_id_solicitud_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.solicitud_prematricula.id_solicitud
+
+Index "prematricula.solicitud_prematricula_pkey"
+    Column    |  Type  | Key? |  Definition  
+--------------+--------+------+--------------
+ id_solicitud | bigint | yes  | id_solicitud
+primary key, btree, for table "prematricula.solicitud_prematricula"
+
+                                                   Table "prematricula.validacion_solicitud"
+    Column     |            Type             | Collation | Nullable |                                 Default                                  
+---------------+-----------------------------+-----------+----------+--------------------------------------------------------------------------
+ id_validacion | bigint                      |           | not null | nextval('prematricula.validacion_solicitud_id_validacion_seq'::regclass)
+ id_solicitud  | bigint                      |           | not null | 
+ id_revision   | bigint                      |           |          | 
+ estado        | character varying(30)       |           | not null | 
+ cursos        | jsonb                       |           | not null | 
+ evaluada_en   | timestamp(0) with time zone |           | not null | 
+Indexes:
+    "validacion_solicitud_pkey" PRIMARY KEY, btree (id_validacion)
+    "pre_val_rev_idx" btree (id_revision)
+    "pre_val_solicitud_uq" UNIQUE CONSTRAINT, btree (id_solicitud)
+Check constraints:
+    "pre_val_estado_ck" CHECK (estado::text = ANY (ARRAY['VALIDA'::character varying, 'PENDIENTE_RESULTADOS'::character varying, 'REQUIERE_AJUSTE'::character varying]::text[]))
+Foreign-key constraints:
+    "pre_val_rev_fk" FOREIGN KEY (id_revision) REFERENCES prematricula.revision_solicitud(id_revision) ON DELETE RESTRICT
+    "pre_val_sol_fk" FOREIGN KEY (id_solicitud) REFERENCES prematricula.solicitud_prematricula(id_solicitud) ON DELETE CASCADE
+
+        Sequence "prematricula.validacion_solicitud_id_validacion_seq"
+  Type  | Start | Minimum |       Maximum       | Increment | Cycles? | Cache 
+--------+-------+---------+---------------------+-----------+---------+-------
+ bigint |     1 |       1 | 9223372036854775807 |         1 | no      |     1
+Owned by: prematricula.validacion_solicitud.id_validacion
+
+Index "prematricula.validacion_solicitud_pkey"
+    Column     |  Type  | Key? |  Definition   
+---------------+--------+------+---------------
+ id_validacion | bigint | yes  | id_validacion
+primary key, btree, for table "prematricula.validacion_solicitud"
+

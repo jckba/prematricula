@@ -1,0 +1,763 @@
+From b7d348f76daca1f8db892d6ea34d251920728619 Mon Sep 17 00:00:00 2001
+From: "Claude (borrador local)" <noreply@anthropic.com>
+Date: Tue, 17 Nov 2026 23:56:40 -0500
+Subject: [PATCH 07/10] feature(pre-matricula): adapta modelos al esquema del
+ portal
+
+---
+ .../Models/CambioCargaDocente.php             | 49 +++++++++++
+ .../PreMatricula/Models/CambioHistorial.php   | 45 ++++++++++
+ .../PreMatricula/Models/CargaDocente.php      | 83 +++++++++++++++++++
+ .../Models/CronogramaPrematricula.php         | 34 ++++++++
+ .../PreMatricula/Models/DetalleSolicitud.php  |  6 ++
+ .../Models/HistorialAcademico.php             | 69 +++++++++++++++
+ .../Models/ImportacionHistorial.php           | 46 ++++++++++
+ .../Models/LimiteCreditosEstudiante.php       | 43 ++++++++++
+ .../PreMatricula/Models/RevisionCurso.php     | 38 +++++++++
+ .../PreMatricula/Models/RevisionSolicitud.php | 79 ++++++++++++++++++
+ .../Models/SolicitudPrematricula.php          | 41 ++++++++-
+ .../Models/ValidacionSolicitud.php            | 50 +++++++++++
+ 12 files changed, 582 insertions(+), 1 deletion(-)
+ create mode 100644 app/Modules/PreMatricula/Models/CambioCargaDocente.php
+ create mode 100644 app/Modules/PreMatricula/Models/CambioHistorial.php
+ create mode 100644 app/Modules/PreMatricula/Models/CargaDocente.php
+ create mode 100644 app/Modules/PreMatricula/Models/HistorialAcademico.php
+ create mode 100644 app/Modules/PreMatricula/Models/ImportacionHistorial.php
+ create mode 100644 app/Modules/PreMatricula/Models/LimiteCreditosEstudiante.php
+ create mode 100644 app/Modules/PreMatricula/Models/RevisionCurso.php
+ create mode 100644 app/Modules/PreMatricula/Models/RevisionSolicitud.php
+ create mode 100644 app/Modules/PreMatricula/Models/ValidacionSolicitud.php
+
+diff --git a/app/Modules/PreMatricula/Models/CambioCargaDocente.php b/app/Modules/PreMatricula/Models/CambioCargaDocente.php
+new file mode 100644
+index 0000000..413d892
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/CambioCargaDocente.php
+@@ -0,0 +1,49 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\ModuleModel;
++use App\Shared\Models\Seguridad\Usuario;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/**
++ * Auditoría de la carga docente. Equivale a teaching_assignment_changes.
++ */
++final class CambioCargaDocente extends ModuleModel
++{
++    public const ACCIONES = ['ALTA', 'CAMBIO', 'BAJA'];
++
++    protected $table = 'prematricula.cambio_carga_docente';
++
++    protected $primaryKey = 'id_cambio';
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'id_carga',
++        'id_actor',
++        'accion',
++        'antes',
++        'despues',
++        'creado_en',
++    ];
++
++    protected function casts(): array
++    {
++        return [
++            'antes' => 'array',
++            'despues' => 'array',
++            'creado_en' => 'datetime',
++        ];
++    }
++
++    public function carga(): BelongsTo
++    {
++        return $this->belongsTo(CargaDocente::class, 'id_carga', 'id_carga');
++    }
++
++    public function actor(): BelongsTo
++    {
++        return $this->belongsTo(Usuario::class, 'id_actor', 'id_usuario');
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/CambioHistorial.php b/app/Modules/PreMatricula/Models/CambioHistorial.php
+new file mode 100644
+index 0000000..2950bc0
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/CambioHistorial.php
+@@ -0,0 +1,45 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\ModuleModel;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/**
++ * Valor anterior/nuevo de un resultado tras una importación. Equivale a academic_history_changes.
++ */
++final class CambioHistorial extends ModuleModel
++{
++    protected $table = 'prematricula.cambio_historial';
++
++    protected $primaryKey = 'id_cambio';
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'id_importacion',
++        'id_historial',
++        'antes',
++        'despues',
++        'creado_en',
++    ];
++
++    protected function casts(): array
++    {
++        return [
++            'antes' => 'array',
++            'despues' => 'array',
++            'creado_en' => 'datetime',
++        ];
++    }
++
++    public function importacion(): BelongsTo
++    {
++        return $this->belongsTo(ImportacionHistorial::class, 'id_importacion', 'id_importacion');
++    }
++
++    public function historial(): BelongsTo
++    {
++        return $this->belongsTo(HistorialAcademico::class, 'id_historial', 'id_historial');
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/CargaDocente.php b/app/Modules/PreMatricula/Models/CargaDocente.php
+new file mode 100644
+index 0000000..af357f0
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/CargaDocente.php
+@@ -0,0 +1,83 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\Core\CursoPlan;
++use App\Shared\Models\Core\PeriodoAcademico;
++use App\Shared\Models\ModuleModel;
++use App\Shared\Models\Seguridad\Usuario;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++use Illuminate\Database\Eloquent\Relations\HasMany;
++use Illuminate\Database\Eloquent\SoftDeletes;
++
++/**
++ * Horas semanales asignadas a un docente en un curso y período.
++ * Equivale a teaching_assignments. La baja es lógica (eliminado_en).
++ *
++ * id_docente apunta a core.docente. Aún no existe App\Shared\Models\Core\Docente;
++ * se debe pedir al equipo antes de declarar la relación.
++ */
++final class CargaDocente extends ModuleModel
++{
++    use SoftDeletes;
++
++    public const CREATED_AT = 'creado_en';
++
++    public const UPDATED_AT = 'actualizado_en';
++
++    public const DELETED_AT = 'eliminado_en';
++
++    protected $table = 'prematricula.carga_docente';
++
++    protected $primaryKey = 'id_carga';
++
++    protected $fillable = [
++        'id_periodo',
++        'id_curso_plan',
++        'id_docente',
++        'horas_teoria',
++        'horas_practica',
++        'horas_laboratorio',
++        'creado_por',
++        'actualizado_por',
++    ];
++
++    protected function casts(): array
++    {
++        return [
++            'horas_teoria' => 'decimal:2',
++            'horas_practica' => 'decimal:2',
++            'horas_laboratorio' => 'decimal:2',
++        ];
++    }
++
++    public function periodo(): BelongsTo
++    {
++        return $this->belongsTo(PeriodoAcademico::class, 'id_periodo', 'id_periodo');
++    }
++
++    public function cursoPlan(): BelongsTo
++    {
++        return $this->belongsTo(CursoPlan::class, 'id_curso_plan', 'id_curso_plan');
++    }
++
++    public function autor(): BelongsTo
++    {
++        return $this->belongsTo(Usuario::class, 'creado_por', 'id_usuario');
++    }
++
++    public function editor(): BelongsTo
++    {
++        return $this->belongsTo(Usuario::class, 'actualizado_por', 'id_usuario');
++    }
++
++    public function cambios(): HasMany
++    {
++        return $this->hasMany(CambioCargaDocente::class, 'id_carga', 'id_carga');
++    }
++
++    public function totalHoras(): float
++    {
++        return (float) $this->horas_teoria + (float) $this->horas_practica + (float) $this->horas_laboratorio;
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/CronogramaPrematricula.php b/app/Modules/PreMatricula/Models/CronogramaPrematricula.php
+index eb228fd..be70b13 100644
+--- a/app/Modules/PreMatricula/Models/CronogramaPrematricula.php
++++ b/app/Modules/PreMatricula/Models/CronogramaPrematricula.php
+@@ -4,10 +4,20 @@
+ 
+ use App\Shared\Models\Core\PeriodoAcademico;
+ use App\Shared\Models\ModuleModel;
++use App\Shared\Models\Seguridad\Usuario;
+ use Illuminate\Database\Eloquent\Relations\BelongsTo;
++use Illuminate\Database\Eloquent\Relations\HasMany;
+ 
++/**
++ * Ventana de prematrícula de un período. Equivale a pre_enrollment_windows.
++ * Un período tiene una ventana ORDINARIA y, opcionalmente, varias EXTRAORDINARIA.
++ */
+ final class CronogramaPrematricula extends ModuleModel
+ {
++    public const TIPO_ORDINARIA = 'ORDINARIA';
++
++    public const TIPO_EXTRAORDINARIA = 'EXTRAORDINARIA';
++
+     protected $table = 'prematricula.cronograma_prematricula';
+ 
+     protected $primaryKey = 'id_cronograma';
+@@ -16,9 +26,14 @@ final class CronogramaPrematricula extends ModuleModel
+ 
+     protected $fillable = [
+         'id_periodo',
++        'tipo',
+         'fecha_inicio',
+         'fecha_fin',
+         'estado',
++        'motivo',
++        'zona_horaria',
++        'creado_por',
++        'creado_en',
+     ];
+ 
+     protected function casts(): array
+@@ -26,6 +41,7 @@ protected function casts(): array
+         return [
+             'fecha_inicio' => 'datetime',
+             'fecha_fin' => 'datetime',
++            'creado_en' => 'datetime',
+         ];
+     }
+ 
+@@ -33,4 +49,22 @@ public function periodo(): BelongsTo
+     {
+         return $this->belongsTo(PeriodoAcademico::class, 'id_periodo', 'id_periodo');
+     }
++
++    public function autor(): BelongsTo
++    {
++        return $this->belongsTo(Usuario::class, 'creado_por', 'id_usuario');
++    }
++
++    public function revisiones(): HasMany
++    {
++        return $this->hasMany(RevisionSolicitud::class, 'id_cronograma', 'id_cronograma');
++    }
++
++    public function estaActiva(?\DateTimeInterface $momento = null): bool
++    {
++        $momento ??= now();
++
++        // Inicio inclusivo, fin exclusivo (regla del proyecto original).
++        return $this->fecha_inicio <= $momento && $momento < $this->fecha_fin;
++    }
+ }
+diff --git a/app/Modules/PreMatricula/Models/DetalleSolicitud.php b/app/Modules/PreMatricula/Models/DetalleSolicitud.php
+index 27d71d0..58197b1 100644
+--- a/app/Modules/PreMatricula/Models/DetalleSolicitud.php
++++ b/app/Modules/PreMatricula/Models/DetalleSolicitud.php
+@@ -7,8 +7,13 @@
+ use App\Shared\Models\ModuleModel;
+ use Illuminate\Database\Eloquent\Relations\BelongsTo;
+ 
++/**
++ * Curso elegido dentro del borrador de una solicitud. Equivale a pre_enrollment_details.
++ */
+ final class DetalleSolicitud extends ModuleModel
+ {
++    public const TURNOS = ['MANANA', 'TARDE', 'SIN_PREFERENCIA'];
++
+     protected $table = 'prematricula.detalle_solicitud';
+ 
+     protected $primaryKey = 'id_detalle';
+@@ -19,6 +24,7 @@ final class DetalleSolicitud extends ModuleModel
+         'id_solicitud',
+         'id_curso_plan',
+         'id_seccion_preferida',
++        'preferencia_turno',
+         'estado',
+         'motivo_rechazo',
+     ];
+diff --git a/app/Modules/PreMatricula/Models/HistorialAcademico.php b/app/Modules/PreMatricula/Models/HistorialAcademico.php
+new file mode 100644
+index 0000000..ec76471
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/HistorialAcademico.php
+@@ -0,0 +1,69 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\Core\CursoPlan;
++use App\Shared\Models\Core\Estudiante;
++use App\Shared\Models\Core\PeriodoAcademico;
++use App\Shared\Models\ModuleModel;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++use Illuminate\Database\Eloquent\Relations\HasMany;
++
++/**
++ * Resultado oficial importado (estudiante/curso/período). Equivale a academic_histories.
++ */
++final class HistorialAcademico extends ModuleModel
++{
++    public const EN_CURSO = 'EN_CURSO';
++
++    public const APROBADO = 'APROBADO';
++
++    public const DESAPROBADO = 'DESAPROBADO';
++
++    public const RETIRADO = 'RETIRADO';
++
++    protected $table = 'prematricula.historial_academico';
++
++    protected $primaryKey = 'id_historial';
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'id_estudiante',
++        'id_curso_plan',
++        'id_periodo',
++        'nota_final',
++        'estado',
++        'creado_en',
++        'actualizado_en',
++    ];
++
++    protected function casts(): array
++    {
++        return [
++            'nota_final' => 'decimal:2',
++            'creado_en' => 'datetime',
++            'actualizado_en' => 'datetime',
++        ];
++    }
++
++    public function estudiante(): BelongsTo
++    {
++        return $this->belongsTo(Estudiante::class, 'id_estudiante', 'id_estudiante');
++    }
++
++    public function cursoPlan(): BelongsTo
++    {
++        return $this->belongsTo(CursoPlan::class, 'id_curso_plan', 'id_curso_plan');
++    }
++
++    public function periodo(): BelongsTo
++    {
++        return $this->belongsTo(PeriodoAcademico::class, 'id_periodo', 'id_periodo');
++    }
++
++    public function cambios(): HasMany
++    {
++        return $this->hasMany(CambioHistorial::class, 'id_historial', 'id_historial');
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/ImportacionHistorial.php b/app/Modules/PreMatricula/Models/ImportacionHistorial.php
+new file mode 100644
+index 0000000..9132bbb
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/ImportacionHistorial.php
+@@ -0,0 +1,46 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\ModuleModel;
++use App\Shared\Models\Seguridad\Usuario;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++use Illuminate\Database\Eloquent\Relations\HasMany;
++
++/**
++ * Archivo de resultados importado. Equivale a academic_history_imports.
++ */
++final class ImportacionHistorial extends ModuleModel
++{
++    protected $table = 'prematricula.importacion_historial';
++
++    protected $primaryKey = 'id_importacion';
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'creado_por',
++        'sha256',
++        'motivo',
++        'resumen',
++        'creado_en',
++    ];
++
++    protected function casts(): array
++    {
++        return [
++            'resumen' => 'array',
++            'creado_en' => 'datetime',
++        ];
++    }
++
++    public function autor(): BelongsTo
++    {
++        return $this->belongsTo(Usuario::class, 'creado_por', 'id_usuario');
++    }
++
++    public function cambios(): HasMany
++    {
++        return $this->hasMany(CambioHistorial::class, 'id_importacion', 'id_importacion');
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/LimiteCreditosEstudiante.php b/app/Modules/PreMatricula/Models/LimiteCreditosEstudiante.php
+new file mode 100644
+index 0000000..07a6b04
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/LimiteCreditosEstudiante.php
+@@ -0,0 +1,43 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\Core\Estudiante;
++use App\Shared\Models\ModuleModel;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/**
++ * Créditos máximos por estudiante. Reemplaza students.creditos_maximos.
++ */
++final class LimiteCreditosEstudiante extends ModuleModel
++{
++    public const CREDITOS_POR_DEFECTO = 22;
++
++    protected $table = 'prematricula.limite_creditos_estudiante';
++
++    protected $primaryKey = 'id_limite';
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'id_estudiante',
++        'creditos_maximos',
++        'actualizado_en',
++    ];
++
++    protected function casts(): array
++    {
++        return ['actualizado_en' => 'datetime'];
++    }
++
++    public function estudiante(): BelongsTo
++    {
++        return $this->belongsTo(Estudiante::class, 'id_estudiante', 'id_estudiante');
++    }
++
++    public static function creditosPara(int $idEstudiante): int
++    {
++        return (int) (self::query()->where('id_estudiante', $idEstudiante)->value('creditos_maximos')
++            ?? self::CREDITOS_POR_DEFECTO);
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/RevisionCurso.php b/app/Modules/PreMatricula/Models/RevisionCurso.php
+new file mode 100644
+index 0000000..a3c6cf1
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/RevisionCurso.php
+@@ -0,0 +1,38 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\Core\CursoPlan;
++use App\Shared\Models\ModuleModel;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/**
++ * Curso contenido en una revisión enviada (clave compuesta id_revision + id_curso_plan).
++ * Fuente para el cálculo de demanda por curso. Solo se inserta; nunca se actualiza.
++ */
++final class RevisionCurso extends ModuleModel
++{
++    protected $table = 'prematricula.revision_curso';
++
++    protected $primaryKey = 'id_revision';
++
++    public $incrementing = false;
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'id_revision',
++        'id_curso_plan',
++        'preferencia_turno',
++    ];
++
++    public function revision(): BelongsTo
++    {
++        return $this->belongsTo(RevisionSolicitud::class, 'id_revision', 'id_revision');
++    }
++
++    public function cursoPlan(): BelongsTo
++    {
++        return $this->belongsTo(CursoPlan::class, 'id_curso_plan', 'id_curso_plan');
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/RevisionSolicitud.php b/app/Modules/PreMatricula/Models/RevisionSolicitud.php
+new file mode 100644
+index 0000000..d569a23
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/RevisionSolicitud.php
+@@ -0,0 +1,79 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\Core\CursoPlan;
++use App\Shared\Models\ModuleModel;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++use Illuminate\Database\Eloquent\Relations\BelongsToMany;
++use Illuminate\Database\Eloquent\Relations\HasMany;
++
++/**
++ * Envío inmutable de una solicitud (snapshot + constancia PDF).
++ * Equivale a pre_enrollment_revisions. Un trigger impide UPDATE y DELETE.
++ */
++final class RevisionSolicitud extends ModuleModel
++{
++    public const MOTIVO_ENVIO = 'ENVIO';
++
++    public const MOTIVO_LEGACY = 'LEGACY_CAPTURE';
++
++    protected $table = 'prematricula.revision_solicitud';
++
++    protected $primaryKey = 'id_revision';
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'id_solicitud',
++        'id_cronograma',
++        'motivo',
++        'numero_revision',
++        'codigo_constancia',
++        'snapshot',
++        'version_esquema',
++        'pdf_base64',
++        'pdf_sha256',
++        'enviada_en',
++        'creado_en',
++    ];
++
++    /** El PDF embebido no se expone al serializar. */
++    protected $hidden = ['pdf_base64'];
++
++    protected function casts(): array
++    {
++        return [
++            'snapshot' => 'array',
++            'enviada_en' => 'datetime',
++            'creado_en' => 'datetime',
++        ];
++    }
++
++    public function solicitud(): BelongsTo
++    {
++        return $this->belongsTo(SolicitudPrematricula::class, 'id_solicitud', 'id_solicitud');
++    }
++
++    public function cronograma(): BelongsTo
++    {
++        return $this->belongsTo(CronogramaPrematricula::class, 'id_cronograma', 'id_cronograma');
++    }
++
++    public function cursos(): HasMany
++    {
++        return $this->hasMany(RevisionCurso::class, 'id_revision', 'id_revision');
++    }
++
++    public function cursosPlan(): BelongsToMany
++    {
++        return $this->belongsToMany(
++            CursoPlan::class,
++            'prematricula.revision_curso',
++            'id_revision',
++            'id_curso_plan',
++            'id_revision',
++            'id_curso_plan',
++        )->withPivot('preferencia_turno');
++    }
++}
+diff --git a/app/Modules/PreMatricula/Models/SolicitudPrematricula.php b/app/Modules/PreMatricula/Models/SolicitudPrematricula.php
+index 13f294d..c463052 100644
+--- a/app/Modules/PreMatricula/Models/SolicitudPrematricula.php
++++ b/app/Modules/PreMatricula/Models/SolicitudPrematricula.php
+@@ -4,13 +4,21 @@
+ 
+ use App\Shared\Models\Core\Estudiante;
+ use App\Shared\Models\Core\PeriodoAcademico;
+-use App\Shared\Models\Seguridad\Usuario;
+ use App\Shared\Models\ModuleModel;
++use App\Shared\Models\Seguridad\Usuario;
+ use Illuminate\Database\Eloquent\Relations\BelongsTo;
+ use Illuminate\Database\Eloquent\Relations\HasMany;
++use Illuminate\Database\Eloquent\Relations\HasOne;
+ 
++/**
++ * Solicitud de prematrícula de un estudiante en un período. Equivale a pre_enrollment_requests.
++ */
+ final class SolicitudPrematricula extends ModuleModel
+ {
++    public const ESTADO_BORRADOR = 'BORRADOR';
++
++    public const ESTADO_ENVIADA = 'ENVIADA';
++
+     protected $table = 'prematricula.solicitud_prematricula';
+ 
+     protected $primaryKey = 'id_solicitud';
+@@ -25,6 +33,10 @@ final class SolicitudPrematricula extends ModuleModel
+         'enviada_en',
+         'revisado_por',
+         'revisado_en',
++        'id_revision_vigente',
++        'id_cronograma_correccion',
++        'creado_en',
++        'actualizado_en',
+     ];
+ 
+     protected function casts(): array
+@@ -32,6 +44,8 @@ protected function casts(): array
+         return [
+             'enviada_en' => 'datetime',
+             'revisado_en' => 'datetime',
++            'creado_en' => 'datetime',
++            'actualizado_en' => 'datetime',
+         ];
+     }
+ 
+@@ -54,4 +68,29 @@ public function revisor(): BelongsTo
+     {
+         return $this->belongsTo(Usuario::class, 'revisado_por', 'id_usuario');
+     }
++
++    public function revisiones(): HasMany
++    {
++        return $this->hasMany(RevisionSolicitud::class, 'id_solicitud', 'id_solicitud');
++    }
++
++    public function revisionVigente(): BelongsTo
++    {
++        return $this->belongsTo(RevisionSolicitud::class, 'id_revision_vigente', 'id_revision');
++    }
++
++    public function cronogramaCorreccion(): BelongsTo
++    {
++        return $this->belongsTo(CronogramaPrematricula::class, 'id_cronograma_correccion', 'id_cronograma');
++    }
++
++    public function validacion(): HasOne
++    {
++        return $this->hasOne(ValidacionSolicitud::class, 'id_solicitud', 'id_solicitud');
++    }
++
++    public function estaEnCorreccion(): bool
++    {
++        return $this->estado === self::ESTADO_BORRADOR && $this->id_cronograma_correccion !== null;
++    }
+ }
+diff --git a/app/Modules/PreMatricula/Models/ValidacionSolicitud.php b/app/Modules/PreMatricula/Models/ValidacionSolicitud.php
+new file mode 100644
+index 0000000..b369714
+--- /dev/null
++++ b/app/Modules/PreMatricula/Models/ValidacionSolicitud.php
+@@ -0,0 +1,50 @@
++<?php
++
++namespace App\Modules\PreMatricula\Models;
++
++use App\Shared\Models\ModuleModel;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/**
++ * Validación académica vigente de una solicitud. Equivale a pre_enrollment_validations.
++ */
++final class ValidacionSolicitud extends ModuleModel
++{
++    public const VALIDA = 'VALIDA';
++
++    public const PENDIENTE_RESULTADOS = 'PENDIENTE_RESULTADOS';
++
++    public const REQUIERE_AJUSTE = 'REQUIERE_AJUSTE';
++
++    protected $table = 'prematricula.validacion_solicitud';
++
++    protected $primaryKey = 'id_validacion';
++
++    public $timestamps = false;
++
++    protected $fillable = [
++        'id_solicitud',
++        'id_revision',
++        'estado',
++        'cursos',
++        'evaluada_en',
++    ];
++
++    protected function casts(): array
++    {
++        return [
++            'cursos' => 'array',
++            'evaluada_en' => 'datetime',
++        ];
++    }
++
++    public function solicitud(): BelongsTo
++    {
++        return $this->belongsTo(SolicitudPrematricula::class, 'id_solicitud', 'id_solicitud');
++    }
++
++    public function revision(): BelongsTo
++    {
++        return $this->belongsTo(RevisionSolicitud::class, 'id_revision', 'id_revision');
++    }
++}
+-- 
+2.43.0
+
