@@ -34,12 +34,12 @@ class PreEnrollmentReceiptTest extends TestCase
         $this->assertMatchesRegularExpression('/Pages:\\s+1\\b/', $metadata);
         $this->assertMatchesRegularExpression('/Page size:\\s+595\\.28 x 841\\.89 pts \\(A4\\)/', $metadata);
         foreach (['Universidad de Prueba', 'Escuela de Ingeniería', 'María', 'Núñez', '000123', '2027-I',
-            'Revisión: 1', 'Créditos totales: 3', 'no constituye matrícula definitiva', 'CUR001', 'CUR003'] as $expected) {
+            'Créditos totales: 3', 'no constituye matrícula definitiva', 'CUR001', 'CUR003', 'MANANA'] as $expected) {
             $this->assertStringContainsString($expected, $text);
         }
-        // TURNO-OCULTO: la constancia ya no imprime la preferencia de turno (antes se esperaba 'MANANA').
-        $this->assertStringNotContainsString('MANANA', $text);
-        $this->assertStringNotContainsString('Preferencia', $text);
+        $this->assertStringNotContainsString('Revisión:', $text);
+        $this->assertStringNotContainsString('Constancia: PRE-', $text);
+        $this->assertSame(1, substr_count($text, 'MANANA'));
         $this->assertSame('2026-10-16T15:00:00.000000Z', $request->currentRevision->submitted_at->toISOString());
         $this->assertStringContainsString('2026-10-16 10:00:00', $text);
     }
