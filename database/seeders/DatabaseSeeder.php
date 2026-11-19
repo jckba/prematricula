@@ -16,10 +16,8 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call([
-            AcademicPeriodSeeder::class,
             UserSeeder::class,
             StudentSeeder::class,
-            AcademicHistorySeeder::class,
         ]);
     }
 }
