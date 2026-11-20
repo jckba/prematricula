@@ -49,6 +49,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('pre_enrollment_request');
+        Schema::dropIfExists('pre_enrollment_requests');
     }
 };
