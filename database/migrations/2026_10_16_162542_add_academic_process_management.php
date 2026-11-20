@@ -19,8 +19,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('academic_period_id')->constrained()->restrictOnDelete();
             $table->string('tipo', 20);
-            $table->timestampTz('fecha_inicio');
-            $table->timestampTz('fecha_fin');
+            $table->dateTime('fecha_inicio');
+            $table->dateTime('fecha_fin');
             $table->text('motivo');
             $table->string('timezone', 64);
             $table->string('origen', 20)->default('API');
@@ -43,8 +43,8 @@ return new class extends Migration
                 foreach ($periods as $period) {
                     DB::table('pre_enrollment_windows')->insert([
                         'academic_period_id' => $period->id, 'tipo' => 'ORDINARIA',
-                        'fecha_inicio' => CarbonImmutable::parse($period->fecha_inicio_prematricula, config('academic.legacy_timezone'))->utc()->toIso8601String(),
-                        'fecha_fin' => CarbonImmutable::parse($period->fecha_fin_prematricula, config('academic.legacy_timezone'))->utc()->toIso8601String(),
+                        'fecha_inicio' => CarbonImmutable::parse($period->fecha_inicio_prematricula, config('academic.legacy_timezone'))->utc()->format('Y-m-d H:i:s'),
+                        'fecha_fin' => CarbonImmutable::parse($period->fecha_fin_prematricula, config('academic.legacy_timezone'))->utc()->format('Y-m-d H:i:s'),
                         'motivo' => 'Migración de fechas heredadas; autor original no registrado.',
                         'timezone' => config('academic.legacy_timezone'), 'origen' => 'MIGRACION',
                         'created_by' => null, 'created_at' => now(), 'updated_at' => now(),
@@ -57,23 +57,23 @@ return new class extends Migration
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
             $table->string('sha256', 64);
             $table->text('motivo');
-            $table->jsonb('summary');
+            $table->json('summary');
             $table->timestamps();
         });
         Schema::create('academic_history_changes', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('academic_history_import_id')->constrained()->restrictOnDelete();
             $table->foreignId('academic_history_id')->constrained()->restrictOnDelete();
-            $table->jsonb('before')->nullable();
-            $table->jsonb('after');
+            $table->json('before')->nullable();
+            $table->json('after');
             $table->timestamps();
         });
         Schema::create('pre_enrollment_validations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('pre_enrollment_request_id')->unique()->constrained()->cascadeOnDelete();
             $table->string('estado', 30);
-            $table->jsonb('cursos');
-            $table->timestampTz('evaluated_at');
+            $table->json('cursos');
+            $table->dateTime('evaluated_at');
             $table->timestamps();
         });
         Schema::table('pre_enrollment_requests', function (Blueprint $table): void {
@@ -84,7 +84,7 @@ return new class extends Migration
             $table->foreignId('pre_enrollment_request_id')->constrained()->restrictOnDelete();
             $table->foreignId('window_id')->nullable()->constrained('pre_enrollment_windows')->restrictOnDelete();
             $table->string('motivo', 50);
-            $table->jsonb('snapshot');
+            $table->json('snapshot');
             $table->timestamps();
         });
     }

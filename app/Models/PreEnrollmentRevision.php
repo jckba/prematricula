@@ -13,8 +13,6 @@ class PreEnrollmentRevision extends Model
 {
     protected $hidden = ['pdf_base64'];
 
-    protected $dateFormat = 'Y-m-d H:i:sP';
-
     protected function casts(): array
     {
         return ['snapshot' => 'array', 'submitted_at' => 'immutable_datetime', 'revision_number' => 'integer', 'schema_version' => 'integer'];

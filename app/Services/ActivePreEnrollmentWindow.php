@@ -19,15 +19,15 @@ class ActivePreEnrollmentWindow
             return null;
         }
 
-        return $period->windows()->where('fecha_inicio', '<=', now()->toIso8601String())
-            ->where('fecha_fin', '>', now()->toIso8601String())->first();
+        return $period->windows()->where('fecha_inicio', '<=', now())
+            ->where('fecha_fin', '>', now())->first();
     }
 
     public function currentPeriod(): AcademicPeriod
     {
         $periods = AcademicPeriod::query()->where('estado', AcademicPeriodStatus::PREMATRICULA)
-            ->whereHas('windows', fn ($query) => $query->where('fecha_inicio', '<=', now()->toIso8601String())
-                ->where('fecha_fin', '>', now()->toIso8601String()))->get();
+            ->whereHas('windows', fn ($query) => $query->where('fecha_inicio', '<=', now())
+                ->where('fecha_fin', '>', now()))->get();
         $target = $this->nextTarget();
 
         if ($target['has_current']) {

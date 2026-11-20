@@ -16,8 +16,6 @@ class PreEnrollmentWindow extends Model
     /** @use HasFactory<PreEnrollmentWindowFactory> */
     use HasFactory;
 
-    protected $dateFormat = 'Y-m-d H:i:sP';
-
     protected function casts(): array
     {
         return ['tipo' => PreEnrollmentWindowType::class, 'fecha_inicio' => 'immutable_datetime', 'fecha_fin' => 'immutable_datetime'];

@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::table('pre_enrollment_revisions', function (Blueprint $table): void {
             $table->unsignedInteger('revision_number')->nullable();
             $table->string('receipt_code', 50)->nullable()->unique();
-            $table->timestampTz('submitted_at')->nullable();
+            $table->dateTime('submitted_at')->nullable();
             $table->unsignedSmallInteger('schema_version')->default(1);
-            $table->text('pdf_base64')->nullable();
+            $table->longText('pdf_base64')->nullable(); // MySQL TEXT stops at 64 KB
             $table->string('pdf_sha256', 64)->nullable();
             $table->unique(['pre_enrollment_request_id', 'revision_number'], 'revision_number_per_request');
             $table->unique(['pre_enrollment_request_id', 'id'], 'revision_request_identity');
@@ -44,7 +44,7 @@ return new class extends Migration
                     if ($revision->motivo === 'ENVIO') {
                         $number++;
                         DB::table('pre_enrollment_revisions')->where('id', $revision->id)->update(['revision_number' => $number,
-                            'submitted_at' => $revision->created_at === null ? null : CarbonImmutable::parse($revision->created_at, 'UTC')->toIso8601String()]);
+                            'submitted_at' => $revision->created_at === null ? null : CarbonImmutable::parse($revision->created_at, 'UTC')->format('Y-m-d H:i:s')]);
                         $lastId = $revision->id;
                     }
                     foreach ($snapshot['detalles'] ?? [] as $detail) {
