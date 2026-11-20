@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\PreEnrollmentRequest;
 use App\Models\PreEnrollmentWindow;
 use App\Models\Student;
+use App\Services\TransactionLock;
 use App\UseCases\PreEnrollment\SubmitPreEnrollment;
 use Dompdf\Dompdf;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -126,12 +127,16 @@ try {
 }
 PHP;
         $autoload = dirname((new ReflectionClass(Dompdf::class))->getFileName(), 4).'/autoload.php';
-        $connection = config('database.connections.pgsql');
-        $environment = ['APP_ENV' => 'testing', 'DB_CONNECTION' => 'pgsql', 'DB_URL' => '',
+        $name = config('database.default');
+        $connection = config("database.connections.{$name}");
+        $environment = ['APP_ENV' => 'testing', 'DB_CONNECTION' => $name, 'DB_URL' => '',
             'DB_HOST' => $connection['host'], 'DB_PORT' => (string) $connection['port'],
             'DB_DATABASE' => $connection['database'], 'DB_USERNAME' => $connection['username'], 'DB_PASSWORD' => $connection['password']];
         $workers = [];
-        DB::select('SELECT pg_advisory_lock(?)', [82640102]);
+        // Hold the academic process lock while both workers boot, as the
+        // PostgreSQL advisory lock did; committing releases it.
+        DB::beginTransaction();
+        app(TransactionLock::class)->acquire(TransactionLock::ACADEMIC_PROCESS);
         try {
             foreach ([$firstExtra, $secondExtra ?? $firstExtra] as $extra) {
                 $worker = new Process([PHP_BINARY, '-r', $code, $action, $autoload, (string) $id, (string) $extra], base_path(), $environment, timeout: 20);
@@ -143,7 +148,7 @@ PHP;
                 $this->assertTrue($ready);
             }
         } finally {
-            DB::select('SELECT pg_advisory_unlock(?)', [82640102]);
+            DB::commit();
         }
         $results = [];
         foreach ($workers as $worker) {

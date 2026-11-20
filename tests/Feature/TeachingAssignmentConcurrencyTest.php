@@ -6,6 +6,7 @@ use App\Models\AcademicPeriod;
 use App\Models\Course;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Services\TransactionLock;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -84,13 +85,17 @@ try {
     exit(1);
 }
 PHP;
-        $connection = config('database.connections.pgsql');
-        $environment = ['APP_ENV' => 'testing', 'DB_CONNECTION' => 'pgsql', 'DB_URL' => '',
+        $name = config('database.default');
+        $connection = config("database.connections.{$name}");
+        $environment = ['APP_ENV' => 'testing', 'DB_CONNECTION' => $name, 'DB_URL' => '',
             'DB_HOST' => $connection['host'], 'DB_PORT' => (string) $connection['port'],
             'DB_DATABASE' => $connection['database'], 'DB_USERNAME' => $connection['username'], 'DB_PASSWORD' => $connection['password'],
             'CACHE_STORE' => 'array', 'SESSION_DRIVER' => 'array'];
         $workers = [];
-        DB::select('SELECT pg_advisory_lock(?)', [82640102]);
+        // Hold the academic process lock while both workers boot, as the
+        // PostgreSQL advisory lock did; committing releases it.
+        DB::beginTransaction();
+        app(TransactionLock::class)->acquire(TransactionLock::ACADEMIC_PROCESS);
         try {
             foreach ($payloads as $payload) {
                 $worker = new Process([PHP_BINARY, '-r', $code, (string) $actorId, json_encode($payload, JSON_THROW_ON_ERROR)],
@@ -103,7 +108,7 @@ PHP;
                 $this->assertTrue($ready, $worker->getErrorOutput());
             }
         } finally {
-            DB::select('SELECT pg_advisory_unlock(?)', [82640102]);
+            DB::commit();
         }
         $results = [];
         foreach ($workers as $worker) {

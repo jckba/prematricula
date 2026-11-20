@@ -17,13 +17,13 @@ class SensitiveDatabaseErrorsTest extends TestCase
     {
         config(['app.debug' => true]);
         $previous = new PDOException('secret-test-password-or-token');
-        $previous->errorInfo = ['23505', 7, 'secret-test-password-or-token'];
-        $exception = new QueryException('pgsql', 'insert into "'.$table.'" values (?)', ['secret-test-hash'], $previous);
+        $previous->errorInfo = ['23000', 1062, 'secret-test-password-or-token'];
+        $exception = new QueryException('mariadb', 'insert into `'.$table.'` values (?)', ['secret-test-hash'], $previous);
         Route::get('/api/v1/testing/database-error', function () use ($exception): never {
             throw $exception;
         });
         Log::shouldReceive('error')->once()->with('Error de base de datos.', [
-            'connection' => 'pgsql', 'sqlstate' => '23505',
+            'connection' => 'mariadb', 'sqlstate' => '23000',
         ]);
 
         $this->getJson('/api/v1/testing/database-error')->assertInternalServerError()

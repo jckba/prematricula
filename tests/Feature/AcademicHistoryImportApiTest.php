@@ -11,7 +11,6 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\TestWith;
 use Shuchkin\SimpleXLSX;
 use Shuchkin\SimpleXLSXGen;
@@ -165,7 +164,7 @@ class AcademicHistoryImportApiTest extends TestCase
             ['000123', 'FAIL', '2026-II', 17, 'APROBADO'],
         ]);
         $preview = $this->postJson(self::BASE.'/validate', ['file' => $file])->assertOk()->json('data');
-        DB::statement('ALTER TABLE academic_histories ADD CONSTRAINT test_grade_failure CHECK (nota_final <> 17)');
+        $this->failDatabaseWrite('academic_histories', 'nota_final', 17);
 
         $this->postJson(self::BASE.'/import', $this->confirmation($file, $preview))->assertInternalServerError();
 

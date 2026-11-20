@@ -19,7 +19,6 @@ use App\UseCases\PreEnrollment\SubmitPreEnrollment;
 use Database\Factories\PreEnrollmentRevisionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\TestWith;
 use Shuchkin\SimpleXLSXGen;
 use Tests\TestCase;
@@ -266,7 +265,7 @@ class AcademicRevalidationTest extends TestCase
             [SimpleXLSXGen::raw('001'), 'BASE', '2026-II', 5, 'DESAPROBADO']];
         $file = UploadedFile::fake()->createWithContent('resultados.xlsx', (string) SimpleXLSXGen::fromArray($rows));
         $preview = $this->postJson('/api/v1/coordinator/academic-history/validate', ['file' => $file])->assertOk()->json('data');
-        DB::statement("ALTER TABLE pre_enrollment_validations ADD CONSTRAINT test_revalidation_failure CHECK (estado <> 'REQUIERE_AJUSTE')");
+        $this->failDatabaseWrite('pre_enrollment_validations', 'estado', 'REQUIERE_AJUSTE');
 
         $this->postJson('/api/v1/coordinator/academic-history/import', [
             'file' => $file, 'sha256' => $preview['sha256'], 'history_fingerprint' => $preview['history_fingerprint'], 'motivo' => 'Resultado final',

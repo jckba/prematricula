@@ -9,7 +9,6 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\TestWith;
 use Shuchkin\SimpleXLSXGen;
 use Tests\TestCase;
@@ -149,7 +148,7 @@ class CurriculumImportTest extends TestCase
             ['FAIL', 'Fallo de base de datos', 4, 1, 2, 0, 0, 'GOOD'],
         ]);
         $preview = $this->postJson(self::BASE.'/validate', ['file' => $file])->assertOk()->json('data');
-        DB::statement("ALTER TABLE courses ADD CONSTRAINT curriculum_test_failure CHECK (codigo <> 'FAIL')");
+        $this->failDatabaseWrite('courses', 'codigo', 'FAIL');
 
         $this->postJson(self::BASE.'/import', ['file' => $file, ...$this->confirmation($preview)])
             ->assertInternalServerError();

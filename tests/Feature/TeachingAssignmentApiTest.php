@@ -10,7 +10,6 @@ use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
@@ -206,7 +205,7 @@ class TeachingAssignmentApiTest extends TestCase
     {
         Sanctum::actingAs(User::factory()->coordinator()->create());
         $data = $this->data();
-        DB::statement("ALTER TABLE teaching_assignment_changes ADD CONSTRAINT reject_test_audit CHECK (accion <> 'CREADA')");
+        $this->failDatabaseWrite('teaching_assignment_changes', 'accion', 'CREADA');
 
         $this->postJson(self::BASE, $data + ['horas_teoria_asignadas' => 1])->assertInternalServerError();
 

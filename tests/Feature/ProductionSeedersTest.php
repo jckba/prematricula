@@ -13,6 +13,7 @@ use Database\Seeders\TeacherSeeder;
 use Database\Seeders\TeachingAssignmentSeeder;
 use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Tests\TestCase;
 
 class ProductionSeedersTest extends TestCase
@@ -65,6 +66,9 @@ class ProductionSeedersTest extends TestCase
         } finally {
             $this->app['env'] = 'testing';
             $provider->boot();
+            // If db:wipe was not blocked it really dropped the tables: MariaDB/MySQL
+            // commit DDL instead of rolling it back with the test transaction.
+            RefreshDatabaseState::$migrated = false;
         }
     }
 }

@@ -12,27 +12,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
-      postgres:
-        image: postgres:16
+      mariadb:
+        # Lowest MariaDB version targeted by production (Hostinger).
+        image: mariadb:10.6
         env:
-          POSTGRES_DB: prematricula_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: testing_only
+          MARIADB_DATABASE: prematricula_test
+          MARIADB_USER: prematricula_test
+          MARIADB_PASSWORD: testing_only
+          MARIADB_ROOT_PASSWORD: testing_only_root
         ports:
-          - 5432:5432
+          - 3306:3306
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
       APP_ENV: testing
       APP_DEBUG: false
-      DB_CONNECTION: pgsql
+      DB_CONNECTION: mariadb
       DB_HOST: 127.0.0.1
-      DB_PORT: 5432
+      DB_PORT: 3306
       DB_DATABASE: prematricula_test
-      DB_USERNAME: postgres
+      DB_USERNAME: prematricula_test
       DB_PASSWORD: testing_only
       DB_URL: ''
       CACHE_STORE: array
@@ -44,7 +46,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: dom, fileinfo, mbstring, pdo_pgsql, simplexml, xml, zip, zlib, gd
+          extensions: dom, fileinfo, mbstring, pdo_mysql, simplexml, xml, zip, zlib, gd
           coverage: none
           tools: composer:v2
       - uses: actions/setup-python@v5
@@ -73,7 +75,7 @@ jobs:
           python -m pip install -r requirements-quality.txt
           python -m openapi_spec_validator OpenAPI/openapi.yaml
           python -c "import json; from jsonschema import validate; validate(json.load(open('OpenAPI/Prematricula.postman_collection.json')), json.load(open('tests/Fixtures/postman-collection-v2.1.schema.json')))"
-      - name: Complete PostgreSQL test suite
+      - name: Complete MariaDB test suite
         run: php vendor/phpunit/phpunit/phpunit --log-junit storage/logs/junit.xml
       - uses: actions/upload-artifact@v4
         if: always()
