@@ -12,6 +12,7 @@ use App\Models\Student;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 
 class AcademicConsultationController extends Controller
 {
@@ -24,7 +25,7 @@ class AcademicConsultationController extends Controller
         if ($request->has('q')) {
             $pattern = '%'.addcslashes($request->validated('q'), '\\%_').'%';
             $query->where(fn (Builder $search) => $search->whereLike('codigo_universitario', $pattern)
-                ->orWhereRaw("concat_ws(' ', nombres, apellidos) ILIKE ?", [$pattern]));
+                ->orWhereLike(DB::raw("concat_ws(' ', nombres, apellidos)"), $pattern));
         }
         if ($request->has('estado')) {
             $query->where('estado', $request->validated('estado'));

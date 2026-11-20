@@ -33,8 +33,8 @@ class CourseController extends Controller
         if ($request->filled('q')) {
             $search = '%'.addcslashes($request->validated('q'), '\\%_').'%';
             $query->where(fn (Builder $query): Builder => $query
-                ->where('codigo', 'ilike', $search)
-                ->orWhere('nombre', 'ilike', $search));
+                ->whereLike('codigo', $search)
+                ->orWhereLike('nombre', $search));
         }
 
         return CourseResource::collection($query->orderBy('ciclo')->orderBy('codigo')->orderBy('id')
