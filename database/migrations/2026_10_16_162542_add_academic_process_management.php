@@ -26,9 +26,15 @@ return new class extends Migration
             $table->string('origen', 20)->default('API');
             $table->foreignId('created_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->timestamps();
-            $table->index(['academic_period_id', 'fecha_inicio', 'fecha_fin']);
+            $table->index(['academic_period_id', 'fecha_inicio', 'fecha_fin'], 'windows_period_range_index');
+            // MariaDB/MySQL have no partial indexes (UNIQUE ... WHERE tipo = 'ORDINARIA').
+            // This generated column holds the period id only for ORDINARIA windows and
+            // NULL otherwise; UNIQUE ignores NULLs, so a period gets at most one
+            // ordinary window and any number of extraordinary ones.
+            $table->unsignedBigInteger('ordinary_period_id')->nullable()
+                ->storedAs("CASE WHEN tipo = 'ORDINARIA' THEN academic_period_id END");
+            $table->unique('ordinary_period_id', 'windows_one_ordinary_per_period');
         });
-        DB::statement("CREATE UNIQUE INDEX windows_one_ordinary_per_period ON pre_enrollment_windows (academic_period_id) WHERE tipo = 'ORDINARIA'");
         DB::statement("ALTER TABLE pre_enrollment_windows ADD CONSTRAINT windows_valid_range CHECK (fecha_inicio < fecha_fin), ADD CONSTRAINT windows_valid_type CHECK (tipo IN ('ORDINARIA', 'EXTRAORDINARIA'))");
 
         DB::table('academic_periods')->whereNotNull('fecha_inicio_prematricula')

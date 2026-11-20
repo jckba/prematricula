@@ -36,7 +36,7 @@ return new class extends Migration
                 'student_id',
                 'course_id',
                 'academic_period_id',
-            ]);
+            ], 'academic_histories_student_course_period_unique'); // MySQL limit: 64-char names
         });
     }
 

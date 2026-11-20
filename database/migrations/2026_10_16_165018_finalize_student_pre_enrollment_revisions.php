@@ -68,27 +68,33 @@ return new class extends Migration
                 revision_number IS NOT NULL AND receipt_code IS NOT NULL AND submitted_at IS NOT NULL
                 AND pdf_base64 IS NOT NULL AND octet_length(pdf_base64) > 0 AND pdf_sha256 IS NOT NULL
                 AND length(pdf_sha256) = 64
-                AND snapshot ?& array['institution', 'estudiante', 'periodo', 'detalles', 'revision_number', 'fecha_envio', 'receipt_code']
+                AND JSON_CONTAINS_PATH(snapshot, 'all', '$.institution', '$.estudiante', '$.periodo', '$.detalles',
+                    '$.revision_number', '$.fecha_envio', '$.receipt_code')
             ))");
-        DB::unprepared("CREATE OR REPLACE FUNCTION protect_pre_enrollment_revision() RETURNS trigger LANGUAGE plpgsql AS $$
-            BEGIN RAISE EXCEPTION 'Las revisiones enviadas son inmutables'; END; $$;
-            CREATE TRIGGER immutable_pre_enrollment_revision BEFORE UPDATE OR DELETE ON pre_enrollment_revisions
-            FOR EACH ROW EXECUTE FUNCTION protect_pre_enrollment_revision();");
+        // A MariaDB/MySQL trigger handles a single event, so UPDATE and DELETE get one
+        // each. SIGNAL SQLSTATE '45000' aborts the statement, like RAISE EXCEPTION did.
+        foreach (['UPDATE' => 'immutable_pre_enrollment_revision_update', 'DELETE' => 'immutable_pre_enrollment_revision_delete'] as $event => $trigger) {
+            DB::unprepared("CREATE TRIGGER {$trigger} BEFORE {$event} ON pre_enrollment_revisions FOR EACH ROW
+                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Las revisiones enviadas son inmutables'");
+        }
     }
 
     public function down(): void
     {
-        DB::statement('DROP TRIGGER IF EXISTS immutable_pre_enrollment_revision ON pre_enrollment_revisions');
-        DB::statement('DROP FUNCTION IF EXISTS protect_pre_enrollment_revision()');
+        DB::unprepared('DROP TRIGGER IF EXISTS immutable_pre_enrollment_revision_update');
+        DB::unprepared('DROP TRIGGER IF EXISTS immutable_pre_enrollment_revision_delete');
         Schema::table('pre_enrollment_validations', fn (Blueprint $table) => $table->dropConstrainedForeignId('revision_id'));
         Schema::dropIfExists('pre_enrollment_revision_courses');
         Schema::table('pre_enrollment_requests', function (Blueprint $table): void {
             $table->dropForeign('current_revision_belongs_to_request');
             $table->dropColumn('current_revision_id');
         });
-        DB::statement('ALTER TABLE pre_enrollment_revisions DROP CONSTRAINT IF EXISTS positive_revision_number');
-        DB::statement('ALTER TABLE pre_enrollment_revisions DROP CONSTRAINT IF EXISTS complete_new_submitted_revision');
+        DB::statement('ALTER TABLE pre_enrollment_revisions DROP CONSTRAINT positive_revision_number');
+        DB::statement('ALTER TABLE pre_enrollment_revisions DROP CONSTRAINT complete_new_submitted_revision');
         Schema::table('pre_enrollment_revisions', function (Blueprint $table): void {
+            // InnoDB backs the pre_enrollment_request_id foreign key with the composite
+            // unique indexes below, so the key needs its own index before they go.
+            $table->index('pre_enrollment_request_id', 'pre_enrollment_revisions_pre_enrollment_request_id_foreign');
             $table->dropUnique('revision_number_per_request');
             $table->dropUnique('revision_request_identity');
             $table->dropUnique(['receipt_code']);

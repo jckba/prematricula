@@ -30,7 +30,7 @@ return new class extends Migration
             $table->unique([
                 'pre_enrollment_request_id',
                 'course_id',
-            ]);
+            ], 'pre_enrollment_details_request_course_unique'); // MySQL limit: 64-char names
         });
     }
 
