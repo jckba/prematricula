@@ -39,6 +39,7 @@ class TransactionLock
         }
     }
 
+    /** @phpstan-impure Reads the database: the second call follows an INSERT. */
     private function lockRow(string $name): bool
     {
         return DB::table('process_locks')->where('name', $name)->lockForUpdate()->value('name') !== null;
