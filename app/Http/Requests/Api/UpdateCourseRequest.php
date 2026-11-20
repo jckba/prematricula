@@ -37,6 +37,8 @@ class UpdateCourseRequest extends FormRequest
         return $rules + [
             'codigo' => ['prohibited'],
             'estado' => ['sometimes', 'required', Rule::enum(RecordStatus::class)],
+            // Confirmación explícita para corregir datos académicos de un curso ya utilizado.
+            'confirmar_correccion' => ['sometimes', 'boolean'],
         ];
     }
 }

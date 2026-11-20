@@ -1,6 +1,7 @@
 import { icon } from './ui';
+import { downloadXlsx } from './xlsx';
 import { context, shell, esc } from './coordinator-support';
-import { accounts, students, periods, curriculum, results, enrollments } from './coordinator-records';
+import { accounts, students, periods, curriculum, enrollments } from './coordinator-records';
 
 // ============================================================================
 // CONFIGURACIÓN MANUAL DE TAMAÑO DEL GRÁFICO (Edita estos valores a tu gusto)
@@ -44,7 +45,7 @@ function getCycleBarStyle(value, thresholds) {
 }
 
 async function dashboard(ctx, user) {
-    shell(ctx, 'Coordinación académica', 'Organiza el proceso académico desde un solo lugar.');
+    shell(ctx, 'Inicio', 'Coordinación académica · Organiza el proceso académico desde un solo lugar.');
     const [periodsResponse] = await Promise.all([
         ctx.request('/academic-periods'),
     ]);
@@ -55,7 +56,7 @@ async function dashboard(ctx, user) {
 
     const content = ctx.root.querySelector('[data-content]');
     const lowerSections =
-        '<section class="dashboard-callout"><span class="callout-icon">' + icon('calendar') + '</span><div><h2>Períodos y ventanas</h2><p>Revisa las fechas que habilitan el registro de prematrícula.</p></div><a class="btn" href="#periods">Gestionar períodos' + icon('arrow') + '</a></section>';
+        '<section class="dashboard-callout"><span class="callout-icon">' + icon('calendar') + '</span><div><h2>Períodos y ventanas</h2><p>Revisa las fechas que habilitan el registro de prematrícula.</p></div><a class="btn btn-raised" href="#periods">Gestionar períodos</a></section>';
 
     const modalHtml =
         '<div data-threshold-modal hidden style="position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,0.55);display:none;align-items:center;justify-content:center;padding:1rem;">' +
@@ -102,10 +103,6 @@ async function dashboard(ctx, user) {
 
     content.innerHTML =
         '<section class="dashboard-analytics-heading" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">' +
-        '<div>' +
-        '<h2 style="margin:0;">Demanda académica</h2>' +
-        '<p style="margin:0.25rem 0 0;">Monitorea la matrícula y demanda por ciclo</p>' +
-        '</div>' +
         '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.75rem;margin-left:auto;">' +
         '<label style="display:inline-flex;align-items:center;gap:0.6rem;margin:0;white-space:nowrap;">' +
         '<span>Filtrar por período</span>' +
@@ -387,7 +384,7 @@ async function demand(ctx) {
             '</div>' +
             '</section>' +
             '<div style="display:flex;justify-content:flex-end;margin-top:0.5rem;margin-bottom:1rem;">' +
-            '<button type="button" class="btn" data-export-demand-csv>' + icon('file') + ' Exportar CSV</button>' +
+            '<button type="button" class="btn btn-raised" data-export-demand-csv>' + icon('file') + '<span>Exportar a Excel</span></button>' +
             '</div>';
 
         const cycleSelect = viewTarget.querySelector('[data-demand-cycle]');
@@ -403,24 +400,23 @@ async function demand(ctx) {
             exportBtn.addEventListener('click', () => {
                 const selectedPeriodText = periodSelect.options[periodSelect.selectedIndex]?.text || periodSelect.value;
                 const suffix = selectedCycle === 'ALL' ? 'todos-los-ciclos' : `ciclo-${selectedCycle}`;
-                const lines = [
-                    ['Ciclo', 'Codigo', 'Curso', 'Estudiantes prematriculados'].join(','),
-                    ...filteredCourses.map(r => [
-                        r.ciclo,
-                        `"${String(r.codigo).replace(/"/g, '""')}"`,
-                        `"${String(r.nombre).replace(/"/g, '""')}"`,
-                        r.registrada,
-                    ].join(',')),
-                ];
-                const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `demanda-por-curso-${selectedPeriodText}-${suffix}.csv`;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                URL.revokeObjectURL(url);
+                const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV'];
+                const cycleText = cycle => 'Ciclo ' + (roman[Number(cycle) - 1] || cycle);
+                const generated = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
+                // Excel real (.xlsx) en lugar de CSV: se abre con columnas separadas en cualquier configuraci\u00F3n regional
+                // y con formato (t\u00EDtulo, encabezados en azul institucional, bordes, filtro y encabezado fijo).
+                downloadXlsx(`demanda-por-curso-${selectedPeriodText}-${suffix}.xlsx`, {
+                    sheetName: 'Demanda ' + selectedPeriodText,
+                    title: 'Demanda acad\u00E9mica por curso',
+                    subtitle: 'Per\u00EDodo ' + selectedPeriodText + ' \u00B7 ' + (selectedCycle === 'ALL' ? 'Todos los ciclos' : cycleText(selectedCycle)) + ' \u00B7 Generado el ' + generated,
+                    columns: [
+                        { header: 'Ciclo', width: 12 },
+                        { header: 'C\u00F3digo', width: 14 },
+                        { header: 'Curso', width: 44 },
+                        { header: 'Estudiantes prematriculados', width: 18, numeric: true },
+                    ],
+                    rows: filteredCourses.map(r => [cycleText(r.ciclo), String(r.codigo), String(r.nombre), Number(r.registrada) || 0]),
+                });
             });
         }
     };
@@ -480,7 +476,7 @@ async function demand(ctx) {
     }
 }
 
-const screens = { accounts, students, periods, curriculum, results, enrollments, demand };
+const screens = { accounts, students, periods, curriculum, enrollments, demand };
 export async function render(section, root, user) {
     const ctx = context(root);
     const screen = screens[section];

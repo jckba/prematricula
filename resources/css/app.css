@@ -327,6 +327,23 @@ input[aria-invalid=true],select[aria-invalid=true],textarea[aria-invalid=true] {
 .filters { background: #fff; padding: 1.2rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1.25rem; align-items: flex-end; }
 .filters .field { flex: 1 1 155px; }
 .filters input,.filters select { min-width: 0; }
+/* Panel de filtros con encabezado ("Búsqueda y filtros" + "Limpiar filtros") e ícono de búsqueda dentro del input. */
+.filters-panel .filters-head { flex: 1 1 100%; display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .25rem; }
+.filters-panel .filters-head h2 { margin: 0; font-size: .95rem; color: var(--ink); }
+.link-button { background: none; border: 0; padding: .25rem 0; color: var(--ink); font-size: .8rem; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.link-button:hover { color: #1f4e79; }
+.link-button:focus-visible { outline: 3px solid #1f4e79; outline-offset: 2px; }
+.input-icon { position: relative; display: block; }
+.input-icon input { padding-right: 2.4rem; }
+/* Lista de datos personales (modal "Información del estudiante"): ícono + etiqueta en mayúsculas, valor debajo, separador fino. */
+.info-list { margin: 0; }
+.info-item { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.info-item:last-child { border-bottom: 0; }
+.info-item dt { display: flex; align-items: center; gap: .6rem; margin: 0 0 .45rem; color: var(--ink); font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.info-item dt .ui-icon { width: 20px; height: 20px; flex: none; color: var(--muted); }
+.info-item dd { margin: 0; color: var(--muted); font-size: .9rem; text-transform: uppercase; overflow-wrap: anywhere; }
+.info-item dd.info-keep-case { text-transform: none; } /* correos y datos donde las mayúsculas confunden */
+.input-icon .ui-icon { position: absolute; right: .8rem; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
 .row-actions { gap: .4rem; }
 .app-shell .btn,.modal .btn { background: linear-gradient(100deg,#e4ac22,#e4b63b); color: #233549; border-color: #dca321; font-weight: 600; min-height: 44px; border-radius: .5rem; padding: .65rem 1.1rem; box-shadow: inset 0 1px 0 rgb(255 255 255 / 28%); }
 .app-shell .btn:hover,.modal .btn:hover { background: #dca51d; color: #182d43; }
@@ -399,6 +416,37 @@ tbody tr:hover { background: #f3f5f7; }
 .modal-wide { width: min(94vw,900px); }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 1rem; margin-block: 1.25rem; }
+.field-required { color: #b42318; font-weight: 700; }
+.field-wide { grid-column: 1 / -1; }
+/* .form-modal: formulario con encabezado (ícono + título + subtítulo), cierre con X, nota informativa y pie de acciones. */
+.modal.form-modal { width: min(92vw,600px); padding: 0; border-radius: .75rem; } /* doble clase: gana al padding de .modal en móvil */
+.form-modal form { display: flex; flex-direction: column; }
+.form-modal-header { display: flex; align-items: flex-start; gap: .9rem; padding: 1.4rem 1.5rem 1.1rem; border-bottom: 1px solid #e5e9ee; }
+.form-modal-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: .6rem; background: #fdeab3; color: #8a6410; }
+.form-modal-icon .ui-icon { width: 22px; height: 22px; }
+.form-modal-heading { flex: 1; min-width: 0; }
+.form-modal-heading h2 { margin: 0; font-size: 1.15rem; color: var(--ink); }
+.form-modal-heading p { margin: .3rem 0 0; font-size: .85rem; color: var(--muted); line-height: 1.5; }
+.form-modal-close { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin: -.25rem -.4rem 0 0; border: 0; border-radius: .5rem; background: transparent; color: var(--muted); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+.form-modal-close:hover { background: #f1f4f8; color: var(--ink); }
+.form-modal-close:focus-visible { outline: 3px solid #1f4e79; outline-offset: 2px; }
+.form-modal-legend { margin: 1rem 1.5rem 0; font-size: .78rem; color: var(--muted); }
+.form-modal .form-grid { margin: 1rem 1.5rem 0; gap: .35rem 1rem; }
+.form-modal .field label { font-size: .82rem; font-weight: 600; color: var(--ink); }
+.form-modal .field input::placeholder { color: #98a4b3; }
+.form-modal .field input:focus,.form-modal .field select:focus { outline: none; border-color: #2478ad; box-shadow: 0 0 0 3px rgb(36 120 173 / 15%); }
+.form-modal .field small:empty { display: none; }
+.form-modal .field-error:empty { min-height: .9rem; }
+.form-modal-note { display: flex; align-items: flex-start; gap: .7rem; margin: .5rem 1.5rem 0; padding: .85rem 1rem; border: 1px solid #b4cfe9; border-left: 4px solid #2f6fae; background: #e8f1fb; color: #123d66; font-size: .82rem; line-height: 1.55; }
+.form-modal-note .ui-icon { flex: none; width: 18px; height: 18px; margin-top: .1rem; }
+.form-modal-note p { margin: 0; }
+.form-modal-note-warning { border-color: #ecd28e; border-left-color: #d49b12; background: #fff5d9; color: #6b4a0b; } /* mismos colores que .toast.notice-warning */
+.form-modal [data-form-error] { margin: 1rem 1.5rem 0; }
+.form-modal-actions { justify-content: flex-end; margin-top: 1.25rem; padding: 1rem 1.5rem; border-top: 1px solid #e5e9ee; background: #fafbfc; border-radius: 0 0 .75rem .75rem; }
+@media (max-width: 640px) {
+    .form-modal-actions { flex-direction: column-reverse; align-items: stretch; }
+    .form-modal-actions .btn { width: 100%; }
+}
 .details { display: grid; gap: .75rem; }
 .details>div { padding-block: .5rem; border-bottom: 1px solid #e7edf3; }
 .details dt { color: var(--muted); font-size: .75rem; margin-bottom: .2rem; text-transform: capitalize; }
@@ -641,9 +689,14 @@ h1[tabindex="-1"]:focus { outline: none; }
 .history-table > table > thead > tr > th { padding: .75rem .9rem; }
 .history-table > table > tbody > tr > td { padding: .8rem .9rem; }
 .history-table > table > tbody > tr > td > strong { font-weight: 700; color: #1f2a37; }
+.history-table .student-code { font-weight: 600; color: #4a5561; } /* código universitario: tono más suave que el negro del texto */
+.history-table .row-actions { justify-content: center; gap: .5rem; flex-wrap: nowrap; }
+.app-shell .btn.row-action { min-height: 36px; padding: .4rem .85rem; gap: .4rem; border-radius: 3px; white-space: nowrap; } /* acción secundaria del mismo tamaño que el botón dorado */
+.row-action .ui-icon { width: 16px; height: 16px; flex-shrink: 0; } /* acciones centradas también cuando vienen del componente table() */
 .history-status { display: inline-block; padding: .25rem .6rem; border: 1px solid; border-left-width: 4px; font-size: .76rem; font-weight: 700; white-space: nowrap; }
 .history-status-done { border-color: #8fcba5; border-left-color: #3f9f63; background: #ebf7ef; color: #1d5e37; }
 .history-status-pending { border-color: #f1c9a6; border-left-color: #d9822b; background: #fff3ea; color: #7a3f0c; }
+.history-status-inactive { border-color: #d3d9e0; border-left-color: #7a8794; background: #f1f3f5; color: #4a5561; }
 /* Affordance: relieve (sombra + borde inferior) que invita a presionar; hover sutil (oscurece ~4%), active hunde, foco visible; flecha = pestaña nueva. */
 /* .btn-raised: affordance compartido de botones de acción principal (relieve, hover sutil, presión, foco). */
 .app-shell .btn.btn-raised { border-radius: 3px; white-space: nowrap; cursor: pointer; border-bottom: 2px solid #b9861a; box-shadow: 0 2px 4px rgb(140 100 20 / 25%), inset 0 1px 0 rgb(255 255 255 / 35%); transition: filter .2s ease; }
@@ -665,4 +718,99 @@ h1[tabindex="-1"]:focus { outline: none; }
     .history-table > table > tbody > tr > td::before { content: attr(data-label); display: block; color: var(--muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
     .history-table > table > tbody > tr > td:last-child { grid-column: 1 / -1; margin-top: .3rem; text-align: left; }
     .history-table > table > tbody > tr > td:last-child::before { display: none; }
+    .history-table .row-actions { justify-content: flex-start; flex-wrap: wrap; }
 }
+/* ===== Malla curricular agrupada por ciclo (.malla-table, sobre .history-table) ===== */
+.malla-table .num { text-align: center; }
+.malla-table abbr { text-decoration: none; cursor: help; }
+/* Columna "Ciclo": celda combinada con el dorado claro del sistema y acento dorado (como los avisos del inicio). */
+.malla-cycle-col { width: 1%; white-space: nowrap; }
+.malla-table tbody .malla-cycle-cell { background: #fdf3d3; border-left: 4px solid #e4ac22; border-right: 1px solid #f0d58f; border-bottom: 1px solid #f0d58f; color: #173c61; font-size: .8rem; font-weight: 800; letter-spacing: .03em; text-align: center; text-transform: uppercase; vertical-align: middle; white-space: nowrap; }
+.malla-table tbody + tbody .malla-cycle-cell { border-top: 2px solid #f0d58f; }
+.malla-cycle-mobile { display: none; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.malla-name { min-width: 220px; }
+/* Fila de total del ciclo: línea doble arriba (convención de suma), fondo neutro y número destacado. */
+.malla-table tbody tr.malla-total,
+.malla-table tbody tr.malla-total:hover { background: #fafbfc; }
+.malla-table tr.malla-total > th,
+.malla-table tr.malla-total > td { padding: .65rem .9rem; border-top: 3px double #b8c2cd; border-bottom: 1px solid #d8dee5; }
+.malla-table tr.malla-total > th { text-align: right; color: #4a5561; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.malla-total-value { color: #173c61; font-size: .95rem; font-weight: 800; }
+.malla-prereq { display: inline-block; margin: .1rem .3rem .1rem 0; padding: .1rem .45rem; border: 1px solid #d3d9e0; background: #f5f7fa; color: #4a5561; font-size: .74rem; font-weight: 600; cursor: help; }
+/* Cursos inactivos: se atenúan pero siguen legibles y con su etiqueta de estado. */
+.malla-table tr.malla-inactive > td:not(:last-child) { color: #7a8794; }
+.malla-table tr.malla-inactive .student-code { color: #7a8794; }
+@media (max-width: 720px) {
+    .malla-table .malla-cycle-col, .malla-table tbody .malla-cycle-cell { display: none; }
+    .malla-table tbody tr.malla-cycle-mobile { display: block; padding: 0; background: #fdf3d3; }
+    .malla-table tbody tr.malla-cycle-mobile > td { display: block; padding: .7rem 1rem; border: 0; border-left: 4px solid #e4ac22; border-bottom: 1px solid #f0d58f; color: #173c61; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+    .malla-table tbody tr.malla-cycle-mobile > td::before { content: none; }
+    .malla-table tbody tr.malla-total { display: flex; justify-content: space-between; align-items: center; padding: 0; border-top: 3px double #b8c2cd; }
+    .malla-table tbody tr.malla-total > th, .malla-table tbody tr.malla-total > td { display: block; border: 0; padding: .7rem 1rem; text-align: left; }
+    .malla-table tbody tr.malla-total > td::before { content: none; }
+    .malla-table tbody tr.malla-total > td:empty { display: none; }
+    .malla-table .num { text-align: left; }
+}
+
+/* Subtítulo de sección dentro de formularios (agrupa campos relacionados). */
+.form-section { margin-top: .75rem; padding-bottom: .35rem; border-bottom: 1px solid #e5e9ee; }
+.form-section:first-child { margin-top: 0; }
+.form-section h3 { margin: 0; color: #173c61; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.form-section p { margin: .25rem 0 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+/* Formulario de 3 columnas (p. ej. horas teoría / práctica / laboratorio en una fila). */
+.form-modal-3col .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .form-modal-3col .form-grid { grid-template-columns: 1fr; } }
+/* Campos bloqueados (p. ej. datos académicos de un curso en uso): se ven claramente no editables. */
+.form-modal .field input:disabled,.form-modal .field select:disabled { background: #f1f3f5; border-color: #d8dee5; color: #4a5561; cursor: not-allowed; }
+
+/* Ventana "Importar malla curricular" (reutiliza .form-modal). */
+.modal.form-modal.form-modal-import { width: min(94vw, 760px); }
+.form-modal-body { padding: 1rem 1.5rem 1.5rem; }
+.import-embedded > p { margin: 0 0 .6rem; color: var(--muted); font-size: .85rem; line-height: 1.55; }
+.import-embedded .toolbar { margin-block: .9rem; }
+/* Importación guiada: pasos numerados y tarjetas para elegir plantilla vacía o malla actual. */
+.import-step { display: flex; align-items: center; gap: .6rem; margin: 1.1rem 0 .6rem; color: var(--ink); font-size: .9rem; }
+.import-step:first-child { margin-top: 0; }
+.import-step-number { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; background: #fdeab3; color: #8a6410; font-size: .78rem; font-weight: 800; }
+.import-choices { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; }
+.import-choice { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; }
+.import-choice small { color: var(--muted); font-size: .76rem; }
+.import-embedded [data-import-form] .field { margin-top: .5rem; }
+/* Selector de archivo de la importación: estado vacío (borde punteado) y estado "archivo cargado" (verde con check). */
+.file-picker { display: flex; align-items: center; gap: .85rem; margin-top: .25rem; padding: .9rem 1rem; border: 2px dashed #c7d2de; background: #fafbfc; cursor: pointer; transition: border-color .15s, background-color .15s; }
+.file-picker:hover { border-color: #8fa6bf; background: #f3f6f9; }
+.file-picker:focus-within { outline: 3px solid #1f4e79; outline-offset: 2px; }
+.file-picker-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: #e8eef5; color: #4a5561; }
+.file-picker-icon .ui-icon { width: 20px; height: 20px; }
+.file-picker-text { display: flex; flex-direction: column; gap: .15rem; flex: 1; min-width: 0; }
+.file-picker-text strong { color: var(--ink); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-picker-text small { color: var(--muted); font-size: .76rem; }
+.file-picker-action { flex: none; padding: .4rem .8rem; border: 1px solid #dce3ec; border-radius: 3px; background: #fff; color: #3a5675; font-size: .78rem; font-weight: 600; }
+.file-picker.file-picker-selected { border-style: solid; border-color: #8fcba5; border-left: 4px solid #3f9f63; background: #ebf7ef; }
+.file-picker-selected .file-picker-icon { background: #d9f0e1; color: #23774a; }
+.file-picker-selected .file-picker-text small { color: #1d5e37; font-weight: 600; }
+/* Estado de carga al validar: el spinner del botón se ve con opacidad completa y aviso con spinner en el área de resultados. */
+.app-shell .btn[aria-busy="true"]:disabled,.modal .btn[aria-busy="true"]:disabled { opacity: 1; }
+.import-loading { display: flex; align-items: center; gap: .7rem; margin-top: 1rem; padding: .9rem 1rem; border: 1px solid #b4cfe9; border-left: 4px solid #2f6fae; background: #e8f1fb; color: #123d66; font-size: .83rem; font-weight: 600; }
+.import-spinner { flex: none; width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin .7s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .import-spinner { animation-duration: 1.6s; } }
+/* Períodos: estado azul (En curso) y nota bajo el estado de la prematrícula. */
+.history-status-info { border-color: #b4cfe9; border-left-color: #2f6fae; background: #e8f1fb; color: #123d66; }
+.period-note { display: block; margin-top: .3rem; color: var(--muted); font-size: .74rem; }
+/* Formulario de 2 columnas (p. ej. inicio / fin en la misma fila). */
+.form-modal-2col .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) { .form-modal-2col .form-grid { grid-template-columns: 1fr; } }
+.nowrap { white-space: nowrap; }
+/* Ventana "Ver detalle" de una prematrícula: resumen en tarjetas, cursos con total y acciones al pie. */
+.detail-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin: 0 0 1.1rem; }
+.detail-summary > div { padding: .7rem .85rem; border: 1px solid var(--border); background: #fafbfc; }
+.detail-summary dt { margin: 0 0 .35rem; color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.detail-summary dd { margin: 0; color: var(--ink); font-size: .88rem; font-weight: 600; }
+.detail-section { margin: 0 0 .6rem; color: #173c61; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.history-table tfoot .detail-total > th, .history-table tfoot .detail-total > td { padding: .65rem .9rem; border-top: 3px double #b8c2cd; background: #fafbfc; color: #4a5561; font-size: .78rem; text-align: right; text-transform: uppercase; }
+.history-table tfoot .detail-total strong { color: #173c61; font-size: .95rem; }
+.history-table .num { text-align: center; }
+.history-table tfoot .detail-total > td.num { text-align: center; }
+.form-modal-body .detail-note { margin: 0 0 1rem; }
+.detail-no-receipt { align-self: center; font-size: .8rem; }

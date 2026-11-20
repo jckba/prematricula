@@ -68,9 +68,9 @@ export function heading(title, description = '') {
     return '<div class="page-heading"><h1 tabindex="-1">' + escape(title) + '</h1><p>' + escape(description) + '</p></div>';
 }
 export function empty(text = 'No hay registros para esta consulta.') { return '<div class="empty"><strong>Sin registros</strong><p>' + escape(text) + '</p></div>'; }
-export function table(columns, rows, actions) {
+export function table(columns, rows, actions, className = '') {
     if (!rows?.length) return empty();
-    return '<div class="table-scroll" role="region" aria-label="Tabla de resultados" tabindex="0"><table><thead><tr>' + columns.map(column => '<th scope="col">' + escape(column[0]) + '</th>').join('') + (actions ? '<th scope="col">Acciones</th>' : '') + '</tr></thead><tbody>' + rows.map(row => '<tr>' + columns.map(column => '<td>' + (column[2] ? column[2](row) : escape(column[1].split('.').reduce((value, key) => value?.[key], row) ?? 'Sin dato')) + '</td>').join('') + (actions ? '<td><div class="row-actions">' + actions(row) + '</div></td>' : '') + '</tr>').join('') + '</tbody></table></div>';
+    return '<div class="table-scroll' + (className ? ' ' + escape(className) : '') + '" role="region" aria-label="Tabla de resultados" tabindex="0"><table><thead><tr>' + columns.map(column => '<th scope="col">' + escape(column[0]) + '</th>').join('') + (actions ? '<th scope="col">Acciones</th>' : '') + '</tr></thead><tbody>' + rows.map(row => '<tr>' + columns.map(column => '<td data-label="' + escape(column[0]) + '">' + (column[2] ? column[2](row) : escape(column[1].split('.').reduce((value, key) => value?.[key], row) ?? 'Sin dato')) + '</td>').join('') + (actions ? '<td data-label="Acciones"><div class="row-actions">' + actions(row) + '</div></td>' : '') + '</tr>').join('') + '</tbody></table></div>';
 }
 export function pagination(meta) {
     if (!meta || meta.last_page <= 1) return '';
@@ -158,6 +158,11 @@ export function icon(name) {
         eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
         logout: '<path d="M9 4H4v16h5M10 12h11m-5-5 5 5-5 5"/>',
         menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+        search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+        "user-plus": '<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M19 8v6M16 11h6"/>',
+        mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+        lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2"/>',
+        "id-card": '<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M5 16a3 3 0 0 1 6 0M14 10h5M14 14h3"/>',
     };
     return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (paths[name] || paths.file) + '</svg>';
 }

@@ -172,9 +172,31 @@ class CurriculumSpreadsheet
     }
 
     /** @param iterable<array{codigo: string, nombre: string, creditos: int, ciclo: int, horas_teoria: string, horas_practica: string, horas_laboratorio: string, prerrequisitos: string}> $courses */
+    /**
+     * Indicaciones por columna. Se muestran como nota de Excel (triángulo rojo) al pasar el mouse por el encabezado.
+     * No cambian el valor de la celda, así que el archivo sigue siendo importable (una hoja, 8 encabezados exactos).
+     */
+    private const COLUMN_HINTS = [
+        'codigo' => "TEXTO · Obligatorio\nCódigo único del curso.\nEj.: INF101\nSolo letras, números, punto (.), guion (-) o guion bajo (_). Sin espacios. Máx. 30 caracteres.\nSi empieza con ceros (ej. 00101), formatea la celda como Texto.",
+        'nombre' => "TEXTO · Obligatorio\nNombre del curso.\nEj.: Programación I\nMáx. 150 caracteres.",
+        'creditos' => "NÚMERO ENTERO · Obligatorio\nCréditos del curso, mayor que 0.\nEj.: 4\nSin decimales.",
+        'ciclo' => "NÚMERO ENTERO · Obligatorio\nCiclo de la malla (1 = primer ciclo).\nEj.: 1\nSin decimales.",
+        'horas_teoria' => "NÚMERO · Obligatorio\nHoras semanales de teoría.\nEj.: 2 o 1.5\nEntero o con hasta 2 decimales. Escribe 0 si no aplica.",
+        'horas_practica' => "NÚMERO · Obligatorio\nHoras semanales de práctica.\nEj.: 2 o 1.5\nEntero o con hasta 2 decimales. Escribe 0 si no aplica.",
+        'horas_laboratorio' => "NÚMERO · Obligatorio\nHoras semanales de laboratorio.\nEj.: 0\nEntero o con hasta 2 decimales. Escribe 0 si no aplica.",
+        'prerrequisitos' => "TEXTO · Opcional\nCódigos de los cursos previos, separados por punto y coma.\nEj.: INF101;MAT101\nDéjalo vacío si no tiene. Cada código debe existir en la malla o en este archivo.",
+    ];
+
+    /** Ancho de cada columna (en caracteres), en el mismo orden que COLUMNS. */
+    private const COLUMN_WIDTHS = [16, 44, 12, 10, 16, 16, 19, 30];
+
+    /** @param iterable<array{codigo: string, nombre: string, creditos: int, ciclo: int, horas_teoria: string, horas_practica: string, horas_laboratorio: string, prerrequisitos: string}> $courses */
     public function write(iterable $courses = []): string
     {
-        $rows = [array_map(SimpleXLSXGen::raw(...), self::COLUMNS)];
+        // Encabezado decorado (azul institucional, texto blanco en negrita, centrado) con su nota de indicaciones.
+        // Los encabezados no deben modificarse: el valor de cada celda sigue siendo exactamente el nombre de la columna.
+        $rows = [array_map(fn (string $column): string => '<style bgcolor="#073C70" color="#FFFFFF" height="26" border="thin"><b><center><middle>'
+            .$column.'</middle></center></b></style><!--Formato: '.self::COLUMN_HINTS[$column].' No uses fórmulas.-->', self::COLUMNS)];
 
         foreach ($courses as $course) {
             $rows[] = [
@@ -189,7 +211,13 @@ class CurriculumSpreadsheet
             ];
         }
 
-        return (string) SimpleXLSXGen::fromArray($rows, 'Malla')->freezePanes('A2')->setColWidth(2, 48);
+        $sheet = SimpleXLSXGen::fromArray($rows, 'Malla')->freezePanes('A2');
+
+        foreach (self::COLUMN_WIDTHS as $index => $width) {
+            $sheet->setColWidth($index + 1, $width);
+        }
+
+        return (string) $sheet;
     }
 
     private function invalidFile(string $message): never

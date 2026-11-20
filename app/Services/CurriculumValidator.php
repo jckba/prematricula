@@ -29,8 +29,10 @@ class CurriculumValidator
     /**
      * @param  list<array<string, mixed>>  $rawRows
      * @param  Collection<int, Course>  $courses
+     * @param  bool  $allowProtectedChanges  true solo para la corrección individual confirmada por coordinación
+     *                                       (PATCH con confirmar_correccion). La importación masiva sigue protegida.
      */
-    public function validate(array $rawRows, Collection $courses): CurriculumImportReport
+    public function validate(array $rawRows, Collection $courses, bool $allowProtectedChanges = false): CurriculumImportReport
     {
         $errors = [];
         $rows = [];
@@ -130,7 +132,7 @@ class CurriculumValidator
 
             $protected = $existing !== null && $this->catalog->isProtected($existing);
 
-            if ($protected && $fields !== []) {
+            if ($protected && $fields !== [] && ! $allowProtectedChanges) {
                 foreach ($fields as $field) {
                     $errors[] = ['row' => $row['row'], 'column' => $field, 'message' => 'El curso ya está utilizado en historial o prematrícula; sus datos académicos y prerrequisitos son inmutables.'];
                 }
