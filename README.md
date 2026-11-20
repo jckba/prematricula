@@ -48,6 +48,7 @@ El workflow [.github/workflows/backend.yml](.github/workflows/backend.yml) insta
 - [API y catálogo de endpoints](docs/API.md)
 - [Formatos de importación](docs/IMPORT_FORMATS.md)
 - [Desarrollo, configuración y producción](docs/DEVELOPMENT.md)
+- [Publicar en Hostinger sin SSH](docs/DEPLOY_HOSTINGER.md) (paquete: `scripts/build-hostinger.sh`)
 - [Entrega e instrucciones para frontend](docs/FRONTEND_HANDOFF.md)
 - [OpenAPI 3.1](OpenAPI/openapi.yaml) y [colección Postman](OpenAPI/Prematricula.postman_collection.json)
 
