@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 class AcademicProcessLock
 {
+    public function __construct(private readonly TransactionLock $lock) {}
+
     /** @template T
      * @param  Closure(): T  $operation
      * @return T
@@ -14,7 +16,7 @@ class AcademicProcessLock
     public function transaction(Closure $operation): mixed
     {
         return DB::transaction(function () use ($operation): mixed {
-            DB::select('SELECT pg_advisory_xact_lock(?)', [82640102]);
+            $this->lock->acquire(TransactionLock::ACADEMIC_PROCESS);
 
             return $operation();
         }, 3);

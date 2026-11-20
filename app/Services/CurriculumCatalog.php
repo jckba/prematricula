@@ -16,6 +16,8 @@ class CurriculumCatalog
 {
     public const ACADEMIC_FIELDS = ['nombre', 'creditos', 'ciclo', 'horas_teoria', 'horas_practica', 'horas_laboratorio'];
 
+    public function __construct(private readonly TransactionLock $lock) {}
+
     /**
      * The transaction lock serializes mutations of the single prerequisite graph,
      * including imports into an initially empty catalogue. Row locks also protect
@@ -29,7 +31,7 @@ class CurriculumCatalog
     public function transaction(Closure $operation): mixed
     {
         return DB::transaction(function () use ($operation): mixed {
-            DB::select('SELECT pg_advisory_xact_lock(?)', [82640101]);
+            $this->lock->acquire(TransactionLock::CURRICULUM_CATALOG);
             $courses = Course::query()->orderBy('id')->lockForUpdate()->get();
             $courses->load('prerequisites');
             $courses->loadCount(['academicHistories', 'preEnrollmentDetails', 'preEnrollmentRevisions']);
