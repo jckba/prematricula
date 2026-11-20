@@ -2,13 +2,13 @@
 
 ## Requisitos
 
-PHP 8.4.1+ (extensiones exigidas por Composer), Composer 2 y PostgreSQL 16 recomendado. El lock se resuelve para PHP 8.4.1 para evitar introducir dependencias exclusivas del PHP más nuevo de un desarrollador. La validación de PDF exige Poppler en PATH. En Windows instalar una distribución de Poppler; en Debian/Ubuntu: `sudo apt-get install poppler-utils`. Python 3.14 y `requirements-quality.txt` son herramientas de documentación, no del servidor.
+PHP 8.4.1+ (extensiones exigidas por Composer), Composer 2 y MariaDB 10.6+ (o MySQL 8.0+). Producción usa MariaDB en un hosting compartido de Hostinger; ver [DEPLOY_HOSTINGER.md](DEPLOY_HOSTINGER.md). La extensión `pdo_mysql` debe estar activa (en Windows, descomentar `extension=pdo_mysql` en php.ini). El lock se resuelve para PHP 8.4.1 para evitar introducir dependencias exclusivas del PHP más nuevo de un desarrollador. La validación de PDF exige Poppler en PATH. En Windows instalar una distribución de Poppler; en Debian/Ubuntu: `sudo apt-get install poppler-utils`. Python 3.14 y `requirements-quality.txt` son herramientas de documentación, no del servidor.
 
 ## Instalación desde un clon limpio
 
 1. Clonar el repositorio y ejecutar `composer install --no-interaction --prefer-dist`.
-2. Copiar `.env.example` a `.env`, completar PostgreSQL y ejecutar `php artisan key:generate --no-interaction`.
-3. Crear bases y roles PostgreSQL independientes según [DATABASE.md](DATABASE.md).
+2. Copiar `.env.example` a `.env`, completar MariaDB y ejecutar `php artisan key:generate --no-interaction`.
+3. Crear bases y usuarios MariaDB independientes según [DATABASE.md](DATABASE.md).
 4. Ejecutar `php artisan migrate --no-interaction`.
 5. Solo en local: `php artisan db:seed --no-interaction`. Es repetible y conserva datos/contraseñas preexistentes.
 6. Iniciar `php artisan serve --host=127.0.0.1` o `composer run dev`.
@@ -24,8 +24,9 @@ PHP 8.4.1+ (extensiones exigidas por Composer), Composer 2 y PostgreSQL 16 recom
 | APP_KEY | Clave generada por entorno, no copiar una clave de test a producción. |
 | APP_DEBUG | false en producción; no exponer información interna. |
 | APP_URL | Origen público de la aplicación. |
-| DB_CONNECTION / DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD | Conexión PostgreSQL. |
+| DB_CONNECTION / DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD | Conexión MariaDB/MySQL (`DB_CONNECTION=mariadb` o `mysql`, puerto 3306). |
 | DB_URL | URL alternativa que puede sobrescribir DB_*; dejar vacía si no se usa. |
+| DB_ISOLATION_LEVEL | Aislamiento de transacciones; `READ COMMITTED` por defecto (el que asumía el código con PostgreSQL). |
 | ACADEMIC_TIMEZONE | Zona para introducir ventanas y presentar fechas académicas; America/Lima por defecto. |
 | ACADEMIC_LEGACY_TIMEZONE | Zona original de fechas heredadas sin timezone; definir antes de su primera migración. |
 | INSTITUTION_UNIVERSITY / INSTITUTION_SCHOOL | Identidad impresa en las constancias nuevas. |
@@ -63,9 +64,11 @@ python -m pip install -r requirements-quality.txt
 python -m openapi_spec_validator OpenAPI/openapi.yaml
 ```
 
-Pint de CI solo verifica; para corregir ejecutar `php vendor/bin/pint --dirty --format agent`. Larastan nivel 5 analiza app, database, routes, config y bootstrap/app.php sin baseline ni errores ignorados. Las relaciones y casts forman parte de su análisis. CI usa PHP 8.4 y PostgreSQL de servicio exclusivo; no usa builds frontend.
+Pint de CI solo verifica; para corregir ejecutar `php vendor/bin/pint --dirty --format agent`. Larastan nivel 5 analiza app, database, routes, config y bootstrap/app.php sin baseline ni errores ignorados. Las relaciones y casts forman parte de su análisis. CI usa PHP 8.4 y un servicio MariaDB exclusivo; no usa builds frontend.
 
 ## Producción
+
+En el hosting compartido de Hostinger (sin SSH) no se ejecutan `composer`, `artisan` ni migraciones en el servidor: se sube un ZIP ya construido y se importa un `.sql` por phpMyAdmin. El procedimiento completo está en [DEPLOY_HOSTINGER.md](DEPLOY_HOSTINGER.md). Lo siguiente aplica a un servidor con acceso por consola.
 
 Usar PHP-FPM/servidor detrás de HTTPS con document root en public. Definir APP_ENV=production, APP_DEBUG=false, APP_KEY propia, CORS exacto, cookies seguras y credenciales de base restringidas. No instalar dependencias de desarrollo en el servidor: `composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader`.
 
@@ -73,4 +76,4 @@ Realizar backup, aplicar `php artisan migrate --force --no-interaction`, prepara
 
 Configurar límites de carga en proxy/PHP coherentes con 5 MiB XLSX y espacio para el multipart. Mantener logs con permisos restringidos y `zend.exception_ignore_args=On`; las consultas fallidas se registran sin SQL/bindings y las importaciones solo registran identificadores/hashes/resúmenes. No usar Pail/debug en producción para mostrar datos a clientes.
 
-Programar limpieza de tokens expirados con `sanctum:prune-expired` según operación institucional. Cache/rate limiting deben ser compartidos si hay varias instancias. Las constancias y snapshots viven en PostgreSQL y deben incluirse en la política de backup.
+Programar limpieza de tokens expirados con `sanctum:prune-expired` según operación institucional. Cache/rate limiting deben ser compartidos si hay varias instancias. Las constancias y snapshots viven en la base de datos y deben incluirse en la política de backup.

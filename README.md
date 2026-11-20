@@ -1,18 +1,18 @@
 # Prematrícula y gestión de carga académica — backend
 
-API REST versionada en `/api/v1`, desarrollada con Laravel 13, PostgreSQL y PHP 8.4.1 o posterior. La plataforma de Composer se fija en 8.4.1; la comprobación local también utiliza PHP 8.5.
+API REST versionada en `/api/v1`, desarrollada con Laravel 13, MariaDB/MySQL y PHP 8.4.1 o posterior. La plataforma de Composer se fija en 8.4.1; la comprobación local también utiliza PHP 8.5.
 
 El alcance incluye autenticación por correo o código, coordinadores director/secretaría, una malla curricular, importaciones XLSX, resultados oficiales, ventanas globales, prematrículas y correcciones versionadas, PDF de una página, consulta académica, demanda estimada y carga docente semanal. Los docentes no tienen cuentas. No existen secciones, horarios, aulas, matrícula definitiva ni aprobación/rechazo del flujo nuevo. El frontend existente no forma parte de esta entrega.
 
 ## Inicio
 
-Requisitos: PHP con las extensiones declaradas en Composer, Composer 2, PostgreSQL 16 recomendado y Poppler (`pdfinfo`, `pdftotext`, `pdftoppm`) para pruebas de PDF. Python 3.14 se usa únicamente para validar documentación; no es una dependencia de ejecución del backend.
+Requisitos: PHP con las extensiones declaradas en Composer, Composer 2, MariaDB 10.6+ (o MySQL 8.0+; producción usa MariaDB en Hostinger) y Poppler (`pdfinfo`, `pdftotext`, `pdftoppm`) para pruebas de PDF. Python 3.14 se usa únicamente para validar documentación; no es una dependencia de ejecución del backend.
 
 ```bash
 composer install
 cp .env.example .env
 php artisan key:generate --no-interaction
-# Crear la base PostgreSQL y configurar DB_* antes de continuar.
+# Crear la base MariaDB (utf8mb4_unicode_ci) y configurar DB_* antes de continuar.
 php artisan migrate --no-interaction
 php artisan db:seed --no-interaction
 php artisan serve --host=127.0.0.1
@@ -36,9 +36,9 @@ python -m pip install -r requirements-quality.txt
 python -m openapi_spec_validator OpenAPI/openapi.yaml
 ```
 
-Las pruebas rechazan cualquier conexión que no sea PostgreSQL `prematricula_test`, antes de ejecutar migraciones. No ejecutar pruebas concurrentemente contra esa misma base. Los comandos destructivos de Artisan están prohibidos fuera del entorno de pruebas aislado. Para desarrollo/producción se utilizan migraciones incrementales, nunca `migrate:fresh`.
+Las pruebas rechazan cualquier conexión que no sea MariaDB/MySQL `prematricula_test`, antes de ejecutar migraciones. No ejecutar pruebas concurrentemente contra esa misma base. Los comandos destructivos de Artisan están prohibidos fuera del entorno de pruebas aislado. Para desarrollo/producción se utilizan migraciones incrementales, nunca `migrate:fresh`.
 
-El workflow [.github/workflows/backend.yml](.github/workflows/backend.yml) instala dependencias bloqueadas, levanta PostgreSQL aislado y ejecuta Composer audit, Pint de verificación, Larastan nivel 5, OpenAPI y toda la suite. No incluye builds frontend.
+El workflow [.github/workflows/backend.yml](.github/workflows/backend.yml) instala dependencias bloqueadas, levanta MariaDB aislado y ejecuta Composer audit, Pint de verificación, Larastan nivel 5, OpenAPI y toda la suite. No incluye builds frontend.
 
 ## Documentación canónica
 
