@@ -1,7 +1,8 @@
 ﻿import { api } from './api';
-import { escape as esc, label, table, pagination, flash, showError, confirmAction } from './ui';
+import { escape as esc, label, table, pagination, flash, showError, confirmAction, icon } from './ui';
 
-export async function renderImport(root, kind, signal) {
+/** embedded: true para mostrarlo dentro de una ventana (sin panel ni título propios; el título lo pone la ventana). */
+export async function renderImport(root, kind, signal, { embedded = false } = {}) {
     const history = kind === 'history';
     const path = history ? '/coordinator/academic-history' : '/coordinator/curriculum';
     let file = null;
@@ -10,16 +11,50 @@ export async function renderImport(root, kind, signal) {
     let pending = false;
     const active = () => root.isConnected && !signal?.aborted;
     const request = (suffix, options = {}) => api(path + suffix, { ...options, signal });
-    root.innerHTML = '<section class="panel"><h2>' + (history ? 'Importar resultados oficiales' : 'Importar malla curricular') +
-        '</h2><p>Descargue la plantilla, complete los datos y valide el archivo antes de confirmar. Máximo 5 MiB. No se admiten fórmulas.</p>' +
-        '<p>Los resultados de validación no guardan cambios. La confirmación aplica el archivo validado.</p>' +
-        '<div class="toolbar"><button type="button" class="btn btn-secondary" data-import="template">Descargar plantilla XLSX</button>' +
-        (!history ? '<button type="button" class="btn btn-secondary" data-import="export">Exportar malla XLSX</button>' : '') + '</div>' +
-        '<form data-import-form><label class="field"><span>Archivo Excel (.xlsx)</span><input type="file" name="file" accept=".xlsx" required></label>' +
+    // Malla en ventana: 3 pasos cortos (descargar, subir, confirmar).
+    const guided = embedded && !history;
+    // Opción de descarga: botón + una línea que dice para qué sirve (mínima carga cognitiva).
+    const choice = (action, button, purpose) => '<div class="import-choice"><button type="button" class="btn btn-small btn-secondary row-action" data-import="' + action + '">' + icon('file') + '<span>' + button + '</span></button><small>' + purpose + '</small></div>';
+    const step = (number, title) => '<h3 class="import-step"><span class="import-step-number" aria-hidden="true">' + number + '</span>' + title + '</h3>';
+    const intro = guided
+        ? step(1, 'Descarga un archivo Excel') +
+            '<div class="import-choices">' +
+            choice('template', 'Plantilla vacía', 'Para agregar cursos nuevos') +
+            choice('export', 'Malla actual', 'Para editar cursos existentes') +
+            '</div>' +
+            step(2, 'Complétalo y súbelo')
+        : '<p>Descargue la plantilla, complete los datos y valide el archivo antes de confirmar. Máximo 5 MiB. No se admiten fórmulas.</p>' +
+            '<p>Los resultados de validación no guardan cambios. La confirmación aplica el archivo validado.</p>' +
+            '<div class="toolbar"><button type="button" class="btn btn-secondary" data-import="template">Descargar plantilla XLSX</button>' +
+            (!history ? '<button type="button" class="btn btn-secondary" data-import="export">Exportar malla XLSX</button>' : '') + '</div>';
+    root.innerHTML = '<section class="' + (embedded ? 'import-embedded' : 'panel') + '">' + (embedded ? '' : '<h2>' + (history ? 'Importar resultados oficiales' : 'Importar malla curricular') + '</h2>') +
+        intro +
+        '<form data-import-form>' + (guided
+            // Selector propio: muestra claramente si ya hay un archivo cargado (nombre, tamaño y opción de cambiarlo).
+            ? '<label class="file-picker" data-file-picker><input type="file" name="file" accept=".xlsx" required class="visually-hidden">' +
+                '<span class="file-picker-icon" data-file-icon aria-hidden="true">' + icon('file') + '</span>' +
+                '<span class="file-picker-text"><strong data-file-name>Selecciona tu archivo Excel</strong><small data-file-meta>Haz clic aquí · solo .xlsx, máx. 5 MB</small></span>' +
+                '<span class="file-picker-action" data-file-action>Elegir archivo</span></label>'
+            : '<label class="field"><span>Archivo Excel (.xlsx)</span><input type="file" name="file" accept=".xlsx" required></label>') +
         (history ? '<label class="field"><span>Motivo de importación</span><textarea name="motivo" maxlength="2000" required></textarea></label>' : '') +
-        '<div class="toolbar"><button class="btn" type="submit">Validar archivo</button><button class="btn" type="button" data-import="confirm" disabled>Confirmar importación</button></div></form>' +
+        '<div class="toolbar"><button class="btn' + (guided ? ' btn-secondary' : '') + '" type="submit">Validar archivo</button>' +
+        (guided ? '</div>' + step(3, 'Revisa y confirma') + '<div class="toolbar">' : '') +
+        '<button class="btn' + (guided ? ' btn-raised' : '') + '" type="button" data-import="confirm" disabled>Confirmar importación</button></div></form>' +
         '<div data-import-report aria-live="polite"></div></section>';
     const form = root.querySelector('form');
+    const picker = root.querySelector('[data-file-picker]');
+    const paintPicker = () => {
+        if (!picker) return;
+        const selected = form.elements.file.files[0];
+        const size = selected ? (selected.size < 1024 * 1024 ? Math.max(1, Math.round(selected.size / 1024)) + ' KB' : (selected.size / 1024 / 1024).toFixed(1) + ' MB') : '';
+        picker.classList.toggle('file-picker-selected', Boolean(selected));
+        picker.querySelector('[data-file-icon]').innerHTML = icon(selected ? 'check-circle' : 'file');
+        picker.querySelector('[data-file-name]').textContent = selected ? selected.name : 'Selecciona tu archivo Excel';
+        picker.querySelector('[data-file-meta]').textContent = selected ? 'Archivo cargado · ' + size : 'Haz clic aquí · solo .xlsx, máx. 5 MB';
+        picker.querySelector('[data-file-action]').textContent = selected ? 'Cambiar archivo' : 'Elegir archivo';
+    };
+    form.addEventListener('change', event => { if (event.target.name === 'file') paintPicker(); }, { signal });
+    form.addEventListener('reset', () => setTimeout(paintPicker), { signal });
     const confirmButton = root.querySelector('[data-import="confirm"]');
     const reportRoot = root.querySelector('[data-import-report]');
     const lock = state => {
@@ -67,18 +102,29 @@ export async function renderImport(root, kind, signal) {
         }
         const body = new FormData();
         body.set('file', file);
+        // Estado de carga visible: spinner en el botón, texto "Validando…" y aviso en el área de resultados.
+        const validateButton = form.querySelector('[type="submit"]');
+        const validateLabel = validateButton.textContent;
+        validateButton.setAttribute('aria-busy', 'true');
+        validateButton.textContent = 'Validando…';
+        reportRoot.innerHTML = '<div class="import-loading" role="status"><span class="import-spinner" aria-hidden="true"></span>Validando el archivo, espera un momento…</div>';
         lock(true);
         try {
-            const response = await request('/validate', { method: 'POST', body });
+            // Duración mínima para que el estado de carga se perciba aunque el servidor responda al instante.
+            const [response] = await Promise.all([request('/validate', { method: 'POST', body }), new Promise(resolve => setTimeout(resolve, 800))]);
             if (active()) { report = response.data; page = 1; display(); }
         } catch (error) {
             if (!active() || error.name === 'AbortError') return;
             const payload = error.payload || error.body || error.data;
             report = payload?.data?.errors ? payload.data : null;
             if (!report && error.report) report = error.report;
-            if (report) { page = 1; display(); }
+            page = 1; display();
             showError(error);
-        } finally { if (active()) lock(false); }
+        } finally {
+            validateButton.removeAttribute('aria-busy');
+            validateButton.textContent = validateLabel;
+            if (active()) lock(false);
+        }
     }, { signal });
     root.addEventListener('click', async event => {
         const pageButton = event.target.closest('[data-page]');

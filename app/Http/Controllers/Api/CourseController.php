@@ -45,6 +45,11 @@ class CourseController extends Controller
     {
         Gate::authorize('view', $course);
 
+        // La coordinación necesita saber si el curso está en uso (datos académicos inmutables) para bloquearlos al editar.
+        if (request()->user()->rol !== UserRole::ESTUDIANTE) {
+            $course->loadCount(['academicHistories', 'preEnrollmentDetails', 'preEnrollmentRevisions']);
+        }
+
         return new CourseResource($course->load('prerequisites'));
     }
 

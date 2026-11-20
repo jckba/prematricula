@@ -191,6 +191,51 @@ class UpdateCourseTest extends TestCase
         $this->assertSame(4, $course->fresh()->creditos);
     }
 
+    public function test_used_course_academic_data_can_be_corrected_with_explicit_confirmation(): void
+    {
+        $user = User::factory()->coordinator()->create();
+        $course = Course::factory()->create();
+        $base = Course::factory()->create(['codigo' => 'BASE1']);
+        $history = $this->createHistory($course);
+
+        $this->withToken($user->createToken('test')->plainTextToken)
+            ->patchJson('/api/v1/coordinator/courses/'.$course->id, [
+                'nombre' => 'Nombre corregido', 'creditos' => 5, 'horas_teoria' => '3.50', 'prerrequisitos' => ['BASE1'],
+                'confirmar_correccion' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.nombre', 'Nombre corregido')
+            ->assertJsonPath('data.creditos', 5)
+            ->assertJsonPath('data.prerrequisitos.0.codigo', 'BASE1');
+
+        $this->assertSame('15.50', $history->refresh()->nota_final);
+        $this->assertModelExists($history);
+        $this->assertModelExists($base);
+    }
+
+    public function test_correction_confirmation_still_applies_graph_validations(): void
+    {
+        $user = User::factory()->coordinator()->create();
+        $course = Course::factory()->create();
+        $this->createHistory($course);
+
+        $this->withToken($user->createToken('test')->plainTextToken)
+            ->patchJson('/api/v1/coordinator/courses/'.$course->id, ['prerrequisitos' => [$course->codigo], 'confirmar_correccion' => true])
+            ->assertUnprocessable();
+
+        $this->assertSame([], $course->fresh()->prerequisites->all());
+    }
+
+    public function test_confirmation_flag_must_be_boolean(): void
+    {
+        $user = User::factory()->coordinator()->create();
+        $course = Course::factory()->create();
+
+        $this->withToken($user->createToken('test')->plainTextToken)
+            ->patchJson('/api/v1/coordinator/courses/'.$course->id, ['creditos' => 5, 'confirmar_correccion' => 'quizas'])
+            ->assertUnprocessable()->assertJsonValidationErrors('confirmar_correccion');
+    }
+
     private function createHistory(Course $course): AcademicHistory
     {
         return AcademicHistory::factory()->for($course)->create();

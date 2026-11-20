@@ -396,7 +396,7 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
             await navigate('/coordinator'); await waitFor('document.querySelector("#screen h1")');
             await waitFor('document.querySelector(".dashboard-metrics") && !document.querySelector("#screen").hasAttribute("aria-busy")');
             await screenshot('coordinator-dashboard-desktop');
-            for (const section of ['accounts','students','curriculum','periods','results','enrollments','demand','teachers','assignments','load']) {
+            for (const section of ['accounts','students','curriculum','periods','enrollments','demand']) {
                 await evaluate('location.hash=' + JSON.stringify(section));
                 await waitFor('document.querySelector("[data-section=' + section + ']").getAttribute("aria-current") === "page" && document.querySelector("#screen h1") && !document.querySelector("#screen").hasAttribute("aria-busy")');
                 const message = await evaluate('document.querySelector("#flash").hidden ? "" : document.querySelector("#flash").textContent');
@@ -413,24 +413,26 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
             await screenshot('coordinator-mobile');
         });
 
-        await t.test('account form sends the documented nested student payload', async () => {
+        await t.test('account form sends the student payload with the university code as initial password', async () => {
             await evaluate('location.hash="accounts"');
             await waitFor('document.querySelector("[data-section=accounts]").getAttribute("aria-current")==="page" && !document.querySelector("#screen").hasAttribute("aria-busy")');
             await evaluate('document.querySelector("[data-action=create]").click()');
             await waitFor('document.querySelector("dialog[open] form")');
             await evaluate(`(() => {
                 const form=document.querySelector("dialog[open] form");
-                const values={"correo_institucional":"fixture@example.invalid","password":"fixture-pass","estudiante.codigo_universitario":"00099","estudiante.nombres":"Registro","estudiante.apellidos":"de prueba","estudiante.creditos_maximos":"22"};
+                const values={"estudiante.codigo_universitario":"0009912345","estudiante.nombres":"Registro","estudiante.apellidos":"de prueba","correo_institucional":"fixture@example.invalid"};
                 for(const [name,value] of Object.entries(values))form.elements.namedItem(name).value=value;
                 form.requestSubmit();
             })()`);
             await waitFor('!document.querySelector("dialog[open]")');
             const request=requests.findLast(item=>item.path==="/api/v1/coordinator/accounts" && item.method==="POST");
-            assert.deepEqual(request.body, { correo_institucional: 'fixture@example.invalid', password: 'fixture-pass', estudiante: { codigo_universitario: '00099', nombres: 'Registro', apellidos: 'de prueba', creditos_maximos: 22 } });
+            assert.deepEqual(request.body, { estudiante: { codigo_universitario: '0009912345', nombres: 'Registro', apellidos: 'de prueba' }, correo_institucional: 'fixture@example.invalid', password: '0009912345' });
         });
         await t.test('curriculum validation and confirmation preserve file and server fingerprints', async () => {
             await evaluate('location.hash="curriculum"');
             await waitFor('document.querySelector("[data-section=curriculum]").getAttribute("aria-current")==="page" && !document.querySelector("#screen").hasAttribute("aria-busy")');
+            await evaluate('document.querySelector("[data-open-import]").click()');
+            await waitFor('document.querySelector("dialog[open] [data-import-form]")');
             await evaluate(`(() => {
                 const form=document.querySelector("[data-import-form]");
                 const transfer=new DataTransfer();transfer.items.add(new File(["ISOLATED_BROWSER_FIXTURE"],"malla.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
@@ -438,10 +440,10 @@ test('portal renders Blade and navigates both roles in a browser using isolated 
             })()`);
             await waitFor('!document.querySelector("[data-import=confirm]").disabled');
             await evaluate('document.querySelector("[data-import=confirm]").click()');
-            await waitFor('document.querySelector("dialog[open]")');
+            await waitFor('document.querySelector("dialog[open] button[value=confirm]")');
             assert.equal(requests.some(item=>item.path==="/api/v1/coordinator/curriculum/import"),false);
             await evaluate('document.querySelector("dialog[open] button[value=confirm]").click()');
-            await waitFor('document.querySelector("[data-import-form] input[type=file]").files.length===0 && !document.querySelector("dialog[open]")');
+            await waitFor('document.querySelector("[data-import-form] input[type=file]").files.length===0 && !document.querySelector("dialog[open] button[value=confirm]")');
             const request=requests.findLast(item=>item.path==="/api/v1/coordinator/curriculum/import");
             assert.ok(request.raw.includes('ISOLATED_BROWSER_FIXTURE'));
             assert.ok(request.raw.includes('a'.repeat(64)));

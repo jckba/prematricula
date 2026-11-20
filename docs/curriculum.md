@@ -107,7 +107,8 @@ En validación se añade `sha256` incluso si hay errores de datos; en confirmaci
 
 - El código identifica al curso: no se renombra por API ni importación. Un código nuevo crea un curso activo. No hay endpoint de eliminación.
 - Cursos sin historial ni detalles de prematrícula: pueden cambiar nombre, créditos, ciclo, horas y prerrequisitos. La lista de prerrequisitos de cada fila reemplaza la lista anterior, no se acumula.
-- Cursos usados en **cualquier** registro de `academic_histories` o `pre_enrollment_details`, incluso borradores: sus datos académicos y prerrequisitos son inmutables. Se rechaza el archivo completo si intenta cambiarlos. Reimportar exactamente los mismos valores sí está permitido. No se reescriben registros históricos ni se introducen planes versionados o snapshots nuevos.
+- Cursos usados en **cualquier** registro de `academic_histories` o `pre_enrollment_details`, incluso borradores: sus datos académicos y prerrequisitos están protegidos. **En la importación** se rechaza el archivo completo si intenta cambiarlos; reimportar exactamente los mismos valores sí está permitido. **Por PATCH** solo pueden corregirse con confirmación explícita (`confirmar_correccion: true`), pensada para errores de digitación; sin ella se responde 422. No se reescriben registros históricos ni se introducen planes versionados o snapshots nuevos.
+- Una corrección confirmada mantiene todas las validaciones (esquema, prerrequisitos existentes, autorreferencias y ciclos), no modifica notas ni historial, y no altera revisiones ni constancias PDF ya emitidas (conservan su snapshot). Tras cambiar datos académicos o estado se revalidan las prematrículas que incluyen el curso.
 - El estado puede cambiar por PATCH incluso para un curso usado. Importar conserva estados existentes, no reactiva cursos ni elimina aquellos que falten en el archivo.
 
 `PATCH /api/v1/coordinator/courses/{course}` recibe JSON parcial. Campos opcionales: `nombre`, `creditos`, `ciclo`, las tres horas, `prerrequisitos` (array de códigos, `[]` para quitar todos) y `estado`. Ejemplo para un curso no utilizado:
@@ -116,7 +117,7 @@ En validación se añade `sha256` incluso si hay errores de datos; en confirmaci
 {"horas_teoria": "2.50", "prerrequisitos": ["00101", "FIS101"]}
 ```
 
-Ejemplo válido incluso para un curso utilizado: `{"estado":"INACTIVO"}`. Las validaciones académicas son las mismas que en importación. Errores de reglas del grafo/protección usan el informe con `row: 0` (la edición JSON no tiene fila Excel); errores de esquema usan `{message, errors}` por campo.
+Ejemplo válido incluso para un curso utilizado: `{"estado":"INACTIVO"}`. Corrección de un curso utilizado: `{"creditos": 4, "confirmar_correccion": true}`. `GET /api/v1/courses/{course}` incluye `en_uso` (booleano) para coordinación, de modo que la interfaz pueda advertir antes de editar. Las validaciones académicas son las mismas que en importación. Errores de reglas del grafo/protección usan el informe con `row: 0` (la edición JSON no tiene fila Excel); errores de esquema usan `{message, errors}` por campo.
 
 ## Exportación y Postman
 

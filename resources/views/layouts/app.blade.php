@@ -24,9 +24,7 @@
         </a>
         <nav>@yield('nav')</nav>
         <div class="sidebar-bottom">
-            <button id="logout-btn" class="user-menu-item" type="button">
-                <span data-shell-icon="logout" aria-hidden="true"></span>Cerrar sesión
-            </button>
+            {{-- "Cerrar sesión" se movió al menú del avatar (topbar). --}}
             <span class="sidebar-caption">Universidad Nacional de Trujillo</span>
         </div>
     </aside>

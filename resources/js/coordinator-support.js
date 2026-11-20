@@ -1,5 +1,5 @@
 ﻿import { api } from './api';
-import { escape as esc, label, heading, table, pagination, showError, busy, flash, confirmAction, detail } from './ui';
+import { escape as esc, label, heading, table, pagination, showError, busy, flash, confirmAction, detail, icon } from './ui';
 
 export const states = ['ACTIVO', 'INACTIVO'];
 export const periodStates = ['PLANIFICACION', 'PREMATRICULA', 'EN_CURSO', 'CERRADO'];
@@ -51,7 +51,7 @@ export function filterForm(fields, values = {}, extra = '') {
         }
         return '<label class="field" for="' + esc(id) + '"><span>' + esc(field.label) + '</span>' + control + '</label>';
     }).join('');
-    return '<form data-filters class="filters">' + controls + '<button class="btn" type="submit">Consultar</button>' + extra + '</form>';
+    return '<form data-filters class="filters">' + controls + '<button class="btn btn-raised" type="submit">' + icon('search') + 'Consultar</button>' + extra + '</form>';
 }
 
 export function queryFrom(form) {
@@ -70,7 +70,7 @@ export function listing(ctx, config) {
             const response = await ctx.request(typeof config.path === 'function' ? config.path(query) : config.path, { query: { ...query, page } });
             if (!ctx.current() || ticket !== revision) return;
             const adapted = config.adapt ? config.adapt(response) : { rows: response.data || [], meta: response.meta || response };
-            target.innerHTML = (config.before?.(response) || '') + table(config.columns, adapted.rows, config.actions) + pagination(adapted.meta);
+            target.innerHTML = (config.before?.(response) || '') + (config.render ? config.render(adapted.rows) : table(config.columns, adapted.rows, config.actions, config.tableClass)) + pagination(adapted.meta);
         } catch (error) {
             if (ctx.current() && ticket === revision && error.name !== 'AbortError') {
                 target.innerHTML = '<div class="notice">No se pudo cargar la consulta. Use Consultar para volver a intentar.</div>';
@@ -83,7 +83,7 @@ export function listing(ctx, config) {
     ctx.on('submit', event => {
         if (!event.target.matches('[data-filters]')) return;
         event.preventDefault();
-        query = queryFrom(event.target);
+        query = { ...(config.query || {}), ...queryFrom(event.target) }; // conserva la consulta base (p. ej. per_page)
         page = 1;
         return load();
     });
