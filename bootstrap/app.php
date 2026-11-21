@@ -45,11 +45,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'token', 'access_token']);
 
         $exceptions->report(function (QueryException $e): bool {
-            Log::error('Error de base de datos.', [
-                'connection' => $e->getConnectionName(),
-                'sqlstate' => $e->getCode(),
-                'detail' => $e->getMessage(), // <-- Te dirá el nombre exacto de la tabla
-            ]);
+            $context = ['connection' => $e->getConnectionName(), 'sqlstate' => $e->errorInfo[0] ?? $e->getCode()];
+
+            // The message embeds the SQL with its bound values (emails, password
+            // hashes, tokens): keep it only on a developer machine.
+            if (app()->isLocal()) {
+                $context['detail'] = $e->getMessage();
+            }
+
+            Log::error('Error de base de datos.', $context);
 
             return false;
         });
